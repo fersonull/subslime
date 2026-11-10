@@ -1,0 +1,27 @@
+# Subslime implementation
+
+Source: the user-provided MVP roadmap. Target: a local-first browser editor, without accounts, payments, watermarks, or automatic source-video uploads.
+
+## Build slices
+
+1. Foundation and caption domain: Vite/React/TypeScript, Tailwind, Zustand, bounded history, word operations, subtitle serializers and shared caption grouping.
+2. Landing and editor: illustrative monochrome page, real upload/preview, text and timing edits, move/trim/snap timeline, seek/zoom, keyboard access, templates and positioning.
+3. Media processing: local FFmpeg audio extraction and ASS/MP4 burn-in; Transformers.js Whisper word timestamps in a worker; progress, retry, cancel and resource cleanup.
+4. Verification: domain regressions, production build, browser workflow and short-video export. Record actual compatibility/benchmark evidence in README.
+
+## Design
+
+Subslime's editable word becomes a physical piece of the headline and film timeline. The oversized “Make every word count.” headline contains a selectable caption. Original monochrome speaker illustrations carry the same sample words across before/after, templates and workflow. All sample captions are explicitly demonstrations.
+
+Landing argument: show the word → show upload/edit/export → compare the captioned result → try four treatments → reveal individual timing controls → start a real video.
+
+Editor question: how does this word look and when does it appear? The video is largest, selected word controls are beside it, timeline underneath. Neutral framed-sheet shell, underline tabs, ink-only controls. No sample captions are inserted into uploaded videos.
+
+## Initial constraints
+
+- Optimize for supported 15-second–3-minute, 720p/1080p videos; initial file guard 200 MB and duration guard 180 seconds.
+- English Whisper tiny model first; display this before generation. Keep original word timestamps and permit correction. Do not claim tested alignment accuracy without a representative listening test.
+- All video processing stays local. Initial model downloads contact Hugging Face; application/font/FFmpeg assets are served by the host. No analytics or backend.
+- MP4 H.264/AAC export uses a single-thread WASM core, off the UI thread, with a cancellable job. Do not promise unrestricted size or codec support.
+- Keep timing finite, positive, non-overlapping and within video duration. Timeline drag and trim are one history entry per gesture.
+- Tests and production build must pass before integration into dev. Real-browser checks use a local preview; publication is a separate launch step after the roadmap's device/accuracy benchmark gates.
