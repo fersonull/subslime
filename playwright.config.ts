@@ -14,7 +14,7 @@ export default defineConfig({
     actionTimeout: 15000,
   },
   webServer: {
-    command: "npm run preview -- --port 4180",
+    command: "npm run preview",
     url: "http://127.0.0.1:4180",
     reuseExistingServer: true,
   },

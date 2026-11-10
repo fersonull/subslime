@@ -44,12 +44,12 @@ self.onmessage = async (event: MessageEvent<{ audio: Float32Array }>) => {
     const result = Array.isArray(output) ? output[0] : output;
     self.postMessage({ type: "complete", chunks: result.chunks ?? [] });
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     self.postMessage({
       type: "error",
-      message:
-        error instanceof Error
-          ? error.message
-          : "Transcription failed. Please retry.",
+      message: /fetch|network|download/i.test(message)
+        ? "Could not download the English speech model. Check your internet connection and access to Hugging Face, then retry. Your existing captions have not been changed."
+        : message || "Transcription failed. Please retry.",
     });
   }
 };

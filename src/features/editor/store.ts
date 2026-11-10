@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { defaultStyle, type EditorProject } from "./types";
-import { validWords } from "./captions";
+import { defaultStyle, type EditorProject } from "../captions/model";
+import { validWords } from "../captions/captions";
 
 type EditorState = {
   project: EditorProject;

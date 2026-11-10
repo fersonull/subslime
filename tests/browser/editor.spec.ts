@@ -372,6 +372,39 @@ test("invalid files show an actionable upload error", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 });
 
+test("caption fetch failures explain how to recover and preserve existing edits", async ({
+  page,
+}) => {
+  const bytes = await fixture(page);
+  await page
+    .getByLabel("Choose a video file")
+    .setInputFiles({
+      name: "speech.webm",
+      mimeType: "video/webm",
+      buffer: bytes,
+    });
+  await page.getByLabel("Add caption", { exact: true }).click();
+  await page.route("**/ffmpeg/ffmpeg-core.js", (route) =>
+    route.abort("connectionrefused"),
+  );
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Regenerate", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("local video engine");
+  await expect(page.getByRole("alert")).toContainText("server");
+  await expect(page.getByLabel("Caption 1 text")).toHaveValue("word");
+
+  await page.unroute("**/ffmpeg/ffmpeg-core.js");
+  await page.route("https://huggingface.co/**", (route) =>
+    route.abort("internetdisconnected"),
+  );
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Regenerate", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("speech model", {
+    timeout: 60000,
+  });
+  await expect(page.getByLabel("Caption 1 text")).toHaveValue("word");
+});
+
 test("1080p karaoke video exports with the bundled mono font", async ({
   page,
 }) => {

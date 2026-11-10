@@ -13,15 +13,20 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import { Brand } from "./Landing";
-import { Caption } from "./Caption";
-import { Sidebar } from "./Sidebar";
-import { Timeline } from "./Timeline";
-import { clamp, displayTime, moveWord, serializeSubtitles } from "./captions";
+import { Brand } from "../../components/Brand";
+import { Caption } from "../captions/components/Caption";
+import { Sidebar } from "./components/Sidebar";
+import { Timeline } from "./components/Timeline";
+import {
+  clamp,
+  displayTime,
+  moveWord,
+  serializeSubtitles,
+} from "../captions/captions";
 import { useEditor } from "./store";
-import { download, processMedia } from "./media";
-import { transcribe } from "./transcription";
-import type { VideoSource } from "./types";
+import { download, processMedia } from "../video/processing";
+import { transcribe } from "../transcription/transcribe";
+import type { VideoSource } from "../video/types";
 
 export function Editor({
   source,

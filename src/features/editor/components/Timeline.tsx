@@ -1,8 +1,13 @@
 import { useRef, useState } from "react";
 import { Magnet, Minus, Plus } from "lucide-react";
-import { clamp, displayTime, moveWord, trimWord } from "./captions";
-import { useEditor } from "./store";
-import type { SubtitleWord } from "./types";
+import {
+  clamp,
+  displayTime,
+  moveWord,
+  trimWord,
+} from "../../captions/captions";
+import { useEditor } from "../store";
+import type { SubtitleWord } from "../../captions/model";
 
 export function Timeline({
   time,

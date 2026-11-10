@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, X } from "lucide-react";
-import { Landing } from "./Landing";
-import { Editor } from "./Editor";
-import { readVideo } from "./media";
-import { useEditor } from "./store";
-import type { VideoSource } from "./types";
+import { Landing } from "../features/landing/Landing";
+import { Editor } from "../features/editor/Editor";
+import { readVideo } from "../features/video/processing";
+import { useEditor } from "../features/editor/store";
+import type { VideoSource } from "../features/video/types";
 
 export function App() {
   const [source, setSource] = useState<VideoSource | null>(null),

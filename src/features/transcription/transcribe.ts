@@ -1,5 +1,5 @@
-import { normalizeWords } from "./captions";
-import type { SubtitleWord } from "./types";
+import { normalizeWords } from "../captions/captions";
+import type { SubtitleWord } from "../captions/model";
 
 export function transcribe(
   audio: Float32Array,
@@ -9,7 +9,7 @@ export function transcribe(
 ): Promise<SubtitleWord[]> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(
-      new URL("./workers/transcription.worker.ts", import.meta.url),
+      new URL("./transcription.worker.ts", import.meta.url),
       { type: "module" },
     );
     const cleanup = () => {

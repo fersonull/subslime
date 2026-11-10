@@ -928,7 +928,7 @@ h2 {
 .editor-home .brand {
   font-size: 23px;
 }
-.editor-home .brand svg {
+.editor-home .brand img {
   width: 23px;
 }
 .editor-home .brand-dot {
@@ -1911,7 +1911,7 @@ h2 {
   .editor-home .brand-dot {
     display: none;
   }
-  .editor-home .brand svg {
+  .editor-home .brand img {
     height: 23px;
     width: 23px;
   }

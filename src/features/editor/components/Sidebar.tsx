@@ -7,9 +7,13 @@ import {
   MIN_WORD,
   splitWord,
   trimWord,
-} from "./captions";
-import { useEditor } from "./store";
-import { templates, templateStyle, type CaptionStyle } from "./types";
+} from "../../captions/captions";
+import { useEditor } from "../store";
+import {
+  templates,
+  templateStyle,
+  type CaptionStyle,
+} from "../../captions/model";
 
 export function Sidebar({
   time,

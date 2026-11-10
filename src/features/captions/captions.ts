@@ -1,4 +1,4 @@
-import type { CaptionStyle, CaptionTemplate, SubtitleWord } from "./types";
+import type { CaptionStyle, CaptionTemplate, SubtitleWord } from "./model";
 
 export const MIN_WORD = 0.04;
 export const clamp = (value: number, min: number, max: number) =>

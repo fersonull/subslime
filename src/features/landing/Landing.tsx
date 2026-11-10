@@ -13,33 +13,17 @@ import {
   Upload,
   Waves,
 } from "lucide-react";
-import { Caption } from "./Caption";
-import { templates, templateStyle, type CaptionTemplate } from "./types";
+import { Caption } from "../captions/components/Caption";
+import {
+  templates,
+  templateStyle,
+  type CaptionTemplate,
+} from "../captions/model";
+import { Brand } from "../../components/Brand";
 
 export const sampleWords = ["Make", "every", "word", "count."].map(
   (text, i) => ({ id: String(i), text, start: i * 0.8, end: (i + 1) * 0.8 }),
 );
-
-export function Brand() {
-  return (
-    <span className="brand">
-      <svg
-        width="29"
-        height="29"
-        viewBox="0 0 30 30"
-        fill="none"
-        aria-hidden="true"
-      >
-        <path
-          d="M2 6h9v6H7v6h4v6H2V6Zm26 0h-9v6h4v6h-4v6h9V6Z"
-          fill="currentColor"
-        />
-        <path d="M13 12h4v6h-4z" fill="currentColor" />
-      </svg>
-      subslime<span className="brand-dot">®</span>
-    </span>
-  );
-}
 
 function MiniTimeline({
   index,

@@ -1,8 +1,11 @@
-import { toAss } from "./captions";
-import type { EditorProject, VideoSource } from "./types";
+import { toAss } from "../captions/captions";
+import type { EditorProject } from "../captions/model";
+import type { VideoSource } from "./types";
 
 export const MAX_BYTES = 200 * 1024 * 1024;
 export const MAX_DURATION = 180;
+const ENGINE_LOAD_ERROR =
+  "Could not load the local video engine. Keep the app server running, then retry. If the app was updated, download any edits before reloading the page.";
 
 export async function readVideo(file: File): Promise<VideoSource> {
   if (!file.size)
@@ -76,7 +79,9 @@ export async function processMedia(
   update: (message: string) => void,
 ): Promise<Float32Array | Blob> {
   update("Loading the local video engine…");
-  const { FFmpeg } = await import("@ffmpeg/ffmpeg");
+  const { FFmpeg } = await import("@ffmpeg/ffmpeg").catch((error) => {
+    throw new Error(ENGINE_LOAD_ERROR, { cause: error });
+  });
   if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
   const ffmpeg = new FFmpeg();
   const cancel = () => ffmpeg.terminate();
@@ -95,10 +100,15 @@ export async function processMedia(
     );
   });
   try {
-    await ffmpeg.load({
-      coreURL: `${location.origin}/ffmpeg/ffmpeg-core.js`,
-      wasmURL: `${location.origin}/ffmpeg/ffmpeg-core.wasm`,
-    });
+    try {
+      await ffmpeg.load({
+        coreURL: `${location.origin}/ffmpeg/ffmpeg-core.js`,
+        wasmURL: `${location.origin}/ffmpeg/ffmpeg-core.wasm`,
+      });
+    } catch (error) {
+      if (signal.aborted) throw error;
+      throw new Error(ENGINE_LOAD_ERROR, { cause: error });
+    }
     await ffmpeg.writeFile(
       "input",
       new Uint8Array(await source.file.arrayBuffer()),

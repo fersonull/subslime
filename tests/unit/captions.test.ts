@@ -8,8 +8,8 @@ import {
   mergeWord,
   captionAt,
   toAss,
-} from "../src/captions";
-import { defaultStyle } from "../src/types";
+} from "../../src/features/captions/captions";
+import { defaultStyle } from "../../src/features/captions/model";
 
 const words = [
   { id: "a", text: "Make", start: 0.1, end: 0.5 },

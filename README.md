@@ -11,6 +11,8 @@ npm ci
 npm run dev
 ```
 
+Open [the local app](http://127.0.0.1:4180/). Keep that terminal/server running while editing: audio extraction and caption generation load processing files on demand. Both development and production preview use port 4180; run one at a time. After rebuilding a production preview, download any current edits and reload the page to load the updated assets.
+
 `npm ci` prepares the local FFmpeg core and downloads the two bundled Noto caption fonts. The UI font ships through Fontsource. For a production build:
 
 ```sh
@@ -18,7 +20,31 @@ npm run build
 npm run preview
 ```
 
-Deploy `dist/` to static hosting over HTTPS at the domain root. Serve `.wasm` as `application/wasm`, avoid SPA-rewriting missing asset URLs, and allow worker scripts from the same origin. This uses single-thread FFmpeg/ONNX and does not require cross-origin isolation or SharedArrayBuffer. No server, API key or environment variables are needed. Public deployment has not been performed.
+Deploy `dist/` to static hosting over HTTPS at the domain root. Serve `.wasm` as `application/wasm`, avoid SPA-rewriting missing asset URLs, and allow worker scripts from the same origin. This uses single-thread FFmpeg/ONNX and does not require cross-origin isolation or SharedArrayBuffer. No backend, API key or environment variables are needed. Public deployment has not been performed.
+
+## Project structure
+
+The React/Vite app uses a conventional feature-based layout. Feature code stays together; shared brand UI is independent of the landing page and editor.
+
+```text
+src/
+  main.tsx                  # React entry point
+  app/                      # App composition and global styles
+  components/               # Shared UI: brand mark
+  features/
+    captions/               # Caption model, timing, serialization and overlay
+    editor/                 # Editor screen, store and timeline/sidebar components
+    landing/                # Landing page and demonstrations
+    transcription/          # Speech worker and worker client
+    video/                  # Import, FFmpeg processing, download and video types
+tests/
+  unit/                     # Caption logic and editor history
+  browser/                  # End-to-end browser workflows
+  fixtures/                 # Generated test media (ignored)
+public/                     # Static artwork, shared slime icon and runtime assets
+scripts/                    # Asset preparation and test-fixture generation
+docs/                       # Implementation notes
+```
 
 ## What works
 
@@ -64,4 +90,4 @@ Production dependencies pass `npm audit --omit=dev`. The `sharp` override select
 
 ## Implementation references
 
-See [IMPLEMENTATION.md](IMPLEMENTATION.md) for the scope and design decisions. The key media APIs follow [Transformers.js ASR](https://huggingface.co/docs/transformers.js/v3.8.1/en/api/pipelines#module_pipelines.AutomaticSpeechRecognitionPipeline) and [FFmpeg.wasm usage](https://ffmpegwasm.netlify.app/docs/getting-started/usage/). Export font sizing compensates for [libass line-metric sizing](https://github.com/libass/libass/blob/0.15.2/libass/ass_font.c#L285) using the bundled fonts' measured 1362/1000 ratio. Caption fonts use the [SIL Open Font License](public/fonts/OFL.txt); the speaker artwork is an original SVG in this project.
+See [implementation notes](docs/implementation.md) for the scope and design decisions. The key media APIs follow [Transformers.js ASR](https://huggingface.co/docs/transformers.js/v3.8.1/en/api/pipelines#module_pipelines.AutomaticSpeechRecognitionPipeline) and [FFmpeg.wasm usage](https://ffmpegwasm.netlify.app/docs/getting-started/usage/). Export font sizing compensates for [libass line-metric sizing](https://github.com/libass/libass/blob/0.15.2/libass/ass_font.c#L285) using the bundled fonts' measured 1362/1000 ratio. Caption fonts use the [SIL Open Font License](public/fonts/OFL.txt); the speaker artwork is an original SVG in this project.

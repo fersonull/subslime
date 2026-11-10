@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
-import { captionAt } from "./captions";
-import type { CaptionStyle, SubtitleWord } from "./types";
+import { captionAt } from "../captions";
+import type { CaptionStyle, SubtitleWord } from "../model";
 
 export function Caption({
   words,

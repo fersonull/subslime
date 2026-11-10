@@ -23,13 +23,6 @@ export type EditorProject = {
   style: CaptionStyle;
   duration: number;
 };
-export type VideoSource = {
-  file: File;
-  url: string;
-  width: number;
-  height: number;
-  duration: number;
-};
 
 export const templates: {
   id: CaptionTemplate;
