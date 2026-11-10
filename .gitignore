@@ -3,7 +3,8 @@ dist/
 test-results/
 playwright-report/
 .env*
-.taste-skill/inspect/
+.taste-skill/
 public/ffmpeg/
 public/fonts/*.ttf
 tests/fixtures/generated/
+*.tsbuildinfo

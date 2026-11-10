@@ -1,0 +1,443 @@
+import { test, expect, type Page } from "@playwright/test";
+import { readFile, mkdir, writeFile } from "node:fs/promises";
+
+const fixtureFolder = "tests/fixtures/generated";
+
+async function fixture(page: Page, width = 720, height = 1280) {
+  await page.goto("/");
+  await page.getByRole("heading", { level: 1 }).click();
+  const wav = await readFile(`${fixtureFolder}/speech.wav`);
+  await page.route("**/test-speech.wav", (route) =>
+    route.fulfill({ body: wav, contentType: "audio/wav" }),
+  );
+  const bytes = await page.evaluate(
+    async ({ width, height }) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d")!;
+      context.scale(width / 720, height / 1280);
+      const audio = new AudioContext();
+      await audio.resume();
+      const buffer = await audio.decodeAudioData(
+        await (await fetch("/test-speech.wav")).arrayBuffer(),
+      );
+      const source = audio.createBufferSource();
+      source.buffer = buffer;
+      const destination = audio.createMediaStreamDestination();
+      source.connect(destination);
+      const stream = new MediaStream([
+        ...canvas.captureStream(24).getVideoTracks(),
+        ...destination.stream.getAudioTracks(),
+      ]);
+      const recorder = new MediaRecorder(stream, {
+        mimeType: "video/webm;codecs=vp8,opus",
+      });
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (e) => chunks.push(e.data);
+      const done = new Promise<Blob>((resolve) => {
+        recorder.onstop = () =>
+          resolve(new Blob(chunks, { type: "video/webm" }));
+      });
+      let frame = 0;
+      const draw = () => {
+        context.fillStyle = "#d5d5d5";
+        context.fillRect(0, 0, 720, 1280);
+        context.fillStyle = "#333";
+        context.fillRect(30, 30, 660, 1220);
+        context.fillStyle = "white";
+        context.font = "bold 50px sans-serif";
+        context.fillText("Subslime test", 160, 420);
+        context.font = "28px sans-serif";
+        context.fillText(`Original frame ${frame++}`, 200, 520);
+      };
+      draw();
+      const timer = setInterval(draw, 1000 / 24);
+      recorder.start();
+      source.start();
+      await new Promise<void>((resolve) => {
+        source.onended = () => resolve();
+      });
+      recorder.stop();
+      clearInterval(timer);
+      const blob = await done;
+      stream.getTracks().forEach((t) => t.stop());
+      await audio.close();
+      return Array.from(new Uint8Array(await blob.arrayBuffer()));
+    },
+    { width, height },
+  );
+  return Buffer.from(bytes);
+}
+
+test("landing is usable at desktop, tablet and phone widths", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  for (const width of [1440, 1024, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.goto("/");
+    await page.evaluate(() => document.fonts.ready);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+      "Make everyword count.",
+    );
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: `test-results/landing-${width}.png`,
+      fullPage: true,
+    });
+  }
+  await page.getByRole("button", { name: /Bold Highlight/ }).click();
+  await expect(
+    page.getByRole("button", { name: /Bold Highlight/ }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Privacy & compatibility" }).click();
+  await expect(page.getByRole("dialog")).toContainText(
+    "no accounts, analytics or video uploads",
+  );
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(page.getByRole("dialog")).not.toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("upload, edit, undo, drag, style, subtitle downloads and playable captioned MP4", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  const bytes = await fixture(page);
+  await page.getByLabel("Choose a video file").setInputFiles({
+    name: "speech.webm",
+    mimeType: "video/webm",
+    buffer: bytes,
+  });
+  await expect(page.getByLabel("Subtitle timeline")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Ready when you are." }),
+  ).toBeVisible();
+  await page.getByLabel("Add caption", { exact: true }).click();
+  const text = page.getByLabel("Caption 1 text");
+  await text.fill("Make");
+  await text.press("Enter");
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(text).toHaveValue("word");
+  await page.getByRole("button", { name: "Redo", exact: true }).click();
+  await expect(text).toHaveValue("Make");
+  await page.keyboard.press("Control+z");
+  await expect(text).toHaveValue("word");
+  await page.keyboard.press("Control+Shift+z");
+  await expect(text).toHaveValue("Make");
+  await page.getByLabel("Caption end time").fill("1.5");
+  await page.getByLabel("Caption end time").press("Tab");
+  await page.getByLabel("Video playhead").fill("2");
+  await page.getByLabel("Add caption", { exact: true }).click();
+  await page.getByLabel("Caption 2 text").fill("count.");
+  await page.getByLabel("Caption 2 text").press("Enter");
+  const clip = page.getByRole("button", { name: /Select count\.,/ });
+  const box = (await clip.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 28, box.y + 10, { steps: 8 });
+  await page.mouse.up();
+  await expect(page.getByLabel("Caption start time")).not.toHaveValue("2.00");
+  await page.getByRole("tab", { name: "Style" }).click();
+  await page.getByRole("tab", { name: "Style" }).press("ArrowLeft");
+  await expect(page.getByRole("tab", { name: /Captions/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await page.getByRole("tab", { name: /Captions/ }).press("ArrowRight");
+  await expect(page.getByRole("tab", { name: "Style" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await page.getByRole("button", { name: "Bold Highlight" }).click();
+  await page.getByLabel("Caption vertical position").fill("65");
+  await page.getByRole("button", { name: "Seek to start" }).click();
+  await expect(page.locator(".video-frame .caption-overlay")).toHaveText(
+    "Make",
+  );
+  const expectedCaptionWidth = await page
+    .locator(".video-frame .caption-overlay")
+    .evaluate(
+      (element) =>
+        (element.getBoundingClientRect().width /
+          element.parentElement!.getBoundingClientRect().width) *
+        720,
+    );
+  await page.screenshot({
+    path: "test-results/editor-desktop.png",
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Export", exact: true }).click();
+  const srtWait = page.waitForEvent("download");
+  await page.getByRole("button", { name: /Subtitle file/ }).click();
+  const srt = await srtWait;
+  const srtText = await readFile((await srt.path())!, "utf8");
+  expect(srtText).toContain("Make");
+  expect(srtText).toContain("00:00:01,500");
+  await page.getByRole("button", { name: "Export", exact: true }).click();
+  const vttWait = page.waitForEvent("download");
+  await page.getByRole("button", { name: /Web captions/ }).click();
+  const vtt = await vttWait;
+  expect(await readFile((await vtt.path())!, "utf8")).toMatch(/^WEBVTT/);
+  await page.getByRole("button", { name: "Export", exact: true }).click();
+  const exportStarted = Date.now();
+  const mp4Wait = page.waitForEvent("download", { timeout: 180000 });
+  await page.getByRole("button", { name: /Captioned video/ }).click();
+  const mp4 = await mp4Wait;
+  const exportMilliseconds = Date.now() - exportStarted;
+  await mkdir(fixtureFolder, { recursive: true });
+  await mp4.saveAs(`${fixtureFolder}/captioned.mp4`);
+  const output = await readFile((await mp4.path())!);
+  expect(output.byteLength).toBeGreaterThan(10000);
+  await page.route("**/test-output.mp4", (route) =>
+    route.fulfill({ body: output, contentType: "video/mp4" }),
+  );
+  const info = await page.evaluate(async () => {
+    const file = await (await fetch("/test-output.mp4")).blob();
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.src = url;
+    video.muted = true;
+    video.style.cssText =
+      "position:fixed;top:0;left:0;width:360px;height:640px;z-index:1000";
+    document.body.append(video);
+    await new Promise<void>((resolve, reject) => {
+      video.onloadeddata = () => resolve();
+      video.onerror = () => reject(new Error("Export is not playable"));
+    });
+    await video.play();
+    await new Promise<void>((resolve) => {
+      const tick = () => {
+        if (video.currentTime > 0.05) resolve();
+        else requestAnimationFrame(tick);
+      };
+      tick();
+    });
+    video.pause();
+    const playedTime = video.currentTime;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d")!.drawImage(video, 0, 0);
+    const bounds = () => {
+      const region = canvas
+        .getContext("2d")!
+        .getImageData(160, 750, 400, 180).data;
+      let minX = 400,
+        maxX = -1,
+        count = 0;
+      for (let i = 0; i < region.length; i += 4)
+        if (region[i] > 220 && region[i + 1] > 220 && region[i + 2] > 220) {
+          const x = (i / 4) % 400;
+          minX = Math.min(minX, x);
+          maxX = Math.max(maxX, x);
+          count++;
+        }
+      return { width: maxX - minX + 1, count };
+    };
+    const captionBounds = bounds();
+    const frame = canvas.toDataURL();
+    const gapFrame = new Promise<void>((resolve) => {
+      const presented = (
+        _now: number,
+        metadata: VideoFrameCallbackMetadata,
+      ) => {
+        if (Math.abs(metadata.mediaTime - 1.8) < 0.1) resolve();
+        else video.requestVideoFrameCallback(presented);
+      };
+      video.requestVideoFrameCallback(presented);
+    });
+    video.currentTime = 1.8;
+    await gapFrame;
+    canvas.getContext("2d")!.drawImage(video, 0, 0);
+    const gapBounds = bounds();
+    const audio = new AudioContext();
+    const buffer = await audio.decodeAudioData(
+      await (await fetch("/test-output.mp4")).arrayBuffer(),
+    );
+    const energy =
+      buffer.getChannelData(0).reduce((sum, value) => sum + value * value, 0) /
+      buffer.length;
+    await audio.close();
+    const result = {
+      width: video.videoWidth,
+      height: video.videoHeight,
+      duration: video.duration,
+      time: playedTime,
+      captionBounds,
+      gapBounds,
+      energy,
+      frame,
+    };
+    video.remove();
+    URL.revokeObjectURL(url);
+    return result;
+  });
+  expect(info.width).toBe(720);
+  expect(info.height).toBe(1280);
+  expect(info.time).toBeGreaterThan(0);
+  // The white caption box appears only within its interval and retains its preview width.
+  expect(info.captionBounds.count).toBeGreaterThan(500);
+  expect(info.gapBounds.count).toBe(0);
+  expect(
+    Math.abs(info.captionBounds.width - expectedCaptionWidth),
+  ).toBeLessThan(16);
+  expect(info.energy).toBeGreaterThan(0.00001);
+  await writeFile(
+    "test-results/export-frame.png",
+    Buffer.from(info.frame.split(",")[1], "base64"),
+  );
+  await writeFile(
+    "test-results/export-metrics.json",
+    JSON.stringify(
+      {
+        width: info.width,
+        height: info.height,
+        duration: info.duration,
+        exportMilliseconds,
+        outputBytes: output.byteLength,
+        audioEnergy: info.energy,
+      },
+      null,
+      2,
+    ),
+  );
+  await page.screenshot({ path: "test-results/editor-after-export.png" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "test-results/editor-phone.png",
+    fullPage: true,
+  });
+  expect(errors).toEqual([]);
+});
+
+test("Whisper generates word timestamps from synthesized English speech and cancellation preserves edits", async ({
+  page,
+}) => {
+  const bytes = await fixture(page);
+  await page.getByLabel("Choose a video file").setInputFiles({
+    name: "speech.webm",
+    mimeType: "video/webm",
+    buffer: bytes,
+  });
+  await page
+    .getByRole("button", { name: "Generate captions", exact: true })
+    .click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "captions generated" }),
+  ).toBeVisible({ timeout: 210000 });
+  const inputs = page.locator(".caption-list input");
+  expect(await inputs.count()).toBeGreaterThan(5);
+  const transcript = (
+    await inputs.evaluateAll((nodes) =>
+      nodes.map((n) => (n as HTMLInputElement).value),
+    )
+  )
+    .join(" ")
+    .toLowerCase();
+  expect(transcript).toContain("make every word count");
+  await page.screenshot({ path: "test-results/editor-transcribed.png" });
+  const before = await inputs.count();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Regenerate", exact: true }).click();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(
+    page.getByText("Processing cancelled. Your captions are unchanged."),
+  ).toBeVisible();
+  expect(await inputs.count()).toBe(before);
+});
+
+test("invalid files show an actionable upload error", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("Choose a video file").setInputFiles({
+    name: "fake.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("not a video"),
+  });
+  await expect(page.getByRole("alert")).toContainText(
+    "Choose an MP4, WebM, or MOV video",
+  );
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+});
+
+test("1080p karaoke video exports with the bundled mono font", async ({
+  page,
+}) => {
+  const bytes = await fixture(page, 1080, 1920);
+  await page.getByLabel("Choose a video file").setInputFiles({
+    name: "portrait1080.webm",
+    mimeType: "video/webm",
+    buffer: bytes,
+  });
+  await page.getByLabel("Add caption", { exact: true }).click();
+  await page.getByLabel("Caption 1 text").fill("Make");
+  await page.getByLabel("Caption 1 text").press("Enter");
+  await page.getByLabel("Caption end time").fill("1.2");
+  await page.getByLabel("Caption end time").press("Tab");
+  await page.getByLabel("Video playhead").fill("1.5");
+  await page.getByLabel("Add caption", { exact: true }).click();
+  await page.getByLabel("Caption 2 text").fill("every");
+  await page.getByLabel("Caption 2 text").press("Enter");
+  await page.getByRole("tab", { name: "Style" }).click();
+  await page.getByRole("button", { name: "Karaoke", exact: true }).click();
+  await page.getByRole("combobox").selectOption("Noto Sans Mono");
+  await page.getByRole("button", { name: "Seek to start" }).click();
+  await expect(page.locator(".video-frame .caption-overlay")).toHaveText(
+    "Makeevery",
+  );
+  await page.getByRole("button", { name: "Export", exact: true }).click();
+  const pending = page.waitForEvent("download", { timeout: 180000 });
+  await page.getByRole("button", { name: /Captioned video/ }).click();
+  const output = await pending;
+  const bytesOut = await readFile((await output.path())!);
+  await output.saveAs(`${fixtureFolder}/karaoke1080.mp4`);
+  await page.route("**/karaoke-output.mp4", (route) =>
+    route.fulfill({ body: bytesOut, contentType: "video/mp4" }),
+  );
+  const result = await page.evaluate(async () => {
+    const url = URL.createObjectURL(
+      await (await fetch("/karaoke-output.mp4")).blob(),
+    );
+    const video = document.createElement("video");
+    document.body.append(video);
+    video.src = url;
+    await new Promise<void>((resolve, reject) => {
+      video.onloadeddata = () => resolve();
+      video.onerror = () => reject(new Error("1080p export cannot be decoded"));
+    });
+    video.currentTime = 0.2;
+    await new Promise<void>((resolve) => {
+      video.onseeked = () => resolve();
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d")!.drawImage(video, 0, 0);
+    const output = {
+      width: video.videoWidth,
+      height: video.videoHeight,
+      frame: canvas.toDataURL(),
+    };
+    video.remove();
+    URL.revokeObjectURL(url);
+    return output;
+  });
+  expect(result.width).toBe(1080);
+  expect(result.height).toBe(1920);
+  await writeFile(
+    "test-results/karaoke1080-frame.png",
+    Buffer.from(result.frame.split(",")[1], "base64"),
+  );
+});

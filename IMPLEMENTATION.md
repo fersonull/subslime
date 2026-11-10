@@ -25,3 +25,13 @@ Editor question: how does this word look and when does it appear? The video is l
 - MP4 H.264/AAC export uses a single-thread WASM core, off the UI thread, with a cancellable job. Do not promise unrestricted size or codec support.
 - Keep timing finite, positive, non-overlapping and within video duration. Timeline drag and trim are one history entry per gesture.
 - Tests and production build must pass before integration into dev. Real-browser checks use a local preview; publication is a separate launch step after the roadmap's device/accuracy benchmark gates.
+
+## Visual review
+
+Reviewed production screenshots at 1440, 1024/768 and 390 pixels, and the real editor and exported frames. Fixed phone overflow from the example waveform's intrinsic width, a retained panel scroll position, wrapping tablet/phone headings, and CSS/libass font-size differences. The automated page inspector reports zero failures with the brief's explicitly requested thin borders allowed. Remaining warnings are intentional: original SVG illustration/interface previews replace stock photography and footage; the dashed frame explains upload; miniature editor fragments retain timeline type sizes; the page uses display/body sizes plus functional preview labels.
+
+The headline's selected word, original speaker, editable demonstration timeline, four caption treatments and large real-video preview carry the product's identity. No invented customers, testimonials, statistics or generated-caption results appear. The landing example is independent of uploaded videos. Reduced motion disables the arrival animation and automatic example cycling.
+
+## Review boundaries
+
+Local files are validated for size, browser-decodable metadata, dimensions and duration. User text renders through React, subtitle text is escaped, and the FFmpeg virtual filesystem uses fixed internal filenames rather than user-controlled paths. No media is posted to a server. Source object URLs are revoked on replacement/exit; processing workers are terminated after use/cancel. Undo history is capped. Full representative media benchmarking and public hosting remain unverified launch work, as detailed in README.
