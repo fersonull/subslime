@@ -1,5 +1,15 @@
 import { useState } from "react";
-import { Check, Merge, Plus, Scissors, Sparkles, Trash2 } from "lucide-react";
+import {
+  Check,
+  CircleCheck,
+  LaptopMinimalCheck,
+  LoaderCircle,
+  Merge,
+  Plus,
+  Scissors,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 import {
   clamp,
   displayTime,
@@ -442,7 +452,12 @@ export function Sidebar({
         </div>
       )}
       <div className="sidebar-footer" role="status" aria-live="off">
-        <span className="local-indicator" /> {saveLabel}
+        {saveLabel === "saving" ? (
+          <LoaderCircle size={16} />
+        ) : (
+          <CircleCheck size={16} />
+        )}{" "}
+        {saveLabel}
       </div>
     </aside>
   );

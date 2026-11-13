@@ -488,9 +488,6 @@ export function Editor({
               onChange={(e) => seek(Number(e.target.value))}
               aria-label="Video playhead"
             />
-            <span className="preview-local">
-              <span className="local-indicator" /> Local preview
-            </span>
           </div>
         </section>
       </div>
