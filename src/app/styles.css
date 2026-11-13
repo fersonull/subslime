@@ -1289,8 +1289,8 @@ h2 {
   position: absolute;
   inset: -100% -30%;
   background:
-    radial-gradient(ellipse at 25% 20%, #ffffff12, #ffffff00 60%),
-    radial-gradient(ellipse at 75% 80%, #ffffff12, #ffffff00 60%);
+    radial-gradient(ellipse at 25% 20%, #ffffff20, #ffffff00 60%),
+    radial-gradient(ellipse at 75% 80%, #ffffff20, #ffffff00 60%);
   pointer-events: none;
   transform: translate(-4%, -5%) rotate(-8deg);
   animation: ai-caption-light 7s cubic-bezier(0.77, 0, 0.175, 1) infinite
