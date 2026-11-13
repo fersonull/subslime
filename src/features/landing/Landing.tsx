@@ -507,7 +507,9 @@ export function Landing({
           captions, style and playback position autosave in this browser's local
           storage. Use “Forget saved project” on the home screen to remove them.
           Clearing site data, private browsing or storage eviction can remove
-          the saved project, so keep downloaded exports as backups.
+          the saved project, so keep downloaded exports as backups. Custom
+          templates are stored separately in this browser and are kept when you
+          forget a project. Delete them in Style or clear site data.
         </p>
         <p>
           First use downloads the English Whisper model from Hugging Face. That
@@ -516,9 +518,9 @@ export function Landing({
         </p>
         <p>
           Start with desktop Chrome or Edge and a short H.264 MP4. This initial
-          version accepts up to 200 MB, 3 minutes and 1080p, where codecs
-          permit. Speed and memory use depend on your device. Check generated
-          words and timing before exporting.
+          version accepts up to 200 MB and 3 minutes, where codecs permit. Speed
+          and memory use depend on your device. Check generated words and timing
+          before exporting.
         </p>
         <form method="dialog">
           <button className="button small">Close</button>

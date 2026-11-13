@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LoaderCircle, X } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
+import { useConfirm } from "../components/ConfirmDialog";
+import { Toast } from "../components/Toast";
 import { Landing } from "../features/landing/Landing";
 import { Editor } from "../features/editor/Editor";
 import { readVideo } from "../features/video/processing";
@@ -17,6 +19,7 @@ import {
 type SaveStatus = "saving" | "saved" | "error";
 
 export function App() {
+  const confirm = useConfirm();
   const [source, setSource] = useState<VideoSource | null>(null);
   const [view, setView] = useState<"landing" | "editor">("landing");
   const [error, setError] = useState(""),
@@ -195,9 +198,12 @@ export function App() {
       const next = await readVideo(file);
       if (
         sourceRef.current &&
-        !window.confirm(
-          "Replace the current project and its local autosave? Download any work you want to keep first.",
-        )
+        !(await confirm({
+          title: "Replace current project?",
+          message:
+            "This replaces the current video and its local autosave. Download any work you want to keep first.",
+          action: "Replace project",
+        }))
       ) {
         URL.revokeObjectURL(next.url);
         return;
@@ -224,9 +230,12 @@ export function App() {
 
   async function forget() {
     if (
-      !window.confirm(
-        "Remove this project and its video from this browser? Download any work you want to keep first.",
-      )
+      !(await confirm({
+        title: "Forget saved project?",
+        message:
+          "Remove this project and its video from this browser? Download any work you want to keep first. Your custom templates will be kept.",
+        action: "Forget project",
+      }))
     )
       return;
     suspended.current = true;
@@ -308,18 +317,7 @@ export function App() {
           event.target.value = "";
         }}
       />
-      {error && (
-        <div role="alert" className="global-message">
-          <span>{error}</span>
-          <button
-            className="icon-button"
-            aria-label="Dismiss upload error"
-            onClick={() => setError("")}
-          >
-            <X size={17} />
-          </button>
-        </div>
-      )}
+      {error && <Toast message={error} error dismiss={() => setError("")} />}
       {storageError && (
         <div className="storage-warning" role="alert">
           <span>

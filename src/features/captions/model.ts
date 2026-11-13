@@ -24,6 +24,32 @@ export type EditorProject = {
   duration: number;
 };
 
+export function isCaptionStyle(value: unknown): value is CaptionStyle {
+  if (!value || typeof value !== "object") return false;
+  const style = value as CaptionStyle;
+  return (
+    templates.some((template) => template.id === style.template) &&
+    ["Noto Sans", "Noto Sans Mono"].includes(style.fontFamily) &&
+    [style.textColor, style.backgroundColor, style.outlineColor].every(
+      (color) => typeof color === "string" && /^#[\da-f]{6}$/i.test(color),
+    ) &&
+    [
+      style.fontSize,
+      style.outlineWidth,
+      style.positionX,
+      style.positionY,
+    ].every(Number.isFinite) &&
+    style.fontSize >= 20 &&
+    style.fontSize <= 140 &&
+    style.outlineWidth >= 0 &&
+    style.outlineWidth <= 20 &&
+    style.positionX >= 5 &&
+    style.positionX <= 95 &&
+    style.positionY >= 5 &&
+    style.positionY <= 95
+  );
+}
+
 export const templates: {
   id: CaptionTemplate;
   name: string;

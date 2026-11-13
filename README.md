@@ -18,7 +18,7 @@ Turn speech into editable word-level captions, adjust their timing and appearanc
 - **Automatic English captions:** Whisper tiny transcription in a worker, with editable word timestamps, download status and cancellation.
 - **Word-level editing:** correct text, add/delete captions, split multiword captions, merge neighbors, and move or trim individual clips.
 - **A synchronized timeline:** scrub, zoom and snap; undo/redo retains up to 100 project edits.
-- **Four caption templates:** Classic Pop, Bold Highlight, Karaoke and Minimal Box.
+- **Caption templates:** Classic Pop, Bold Highlight, Karaoke and Minimal Box, plus your own saved styles (free for now).
 - **Style controls:** font, size, text/background color and caption position, including dragging in the preview.
 - **Exports:** H.264/AAC MP4 with burned-in captions, or individual-word SRT and VTT files.
 - **Monochrome interface:** responsive layouts, keyboard controls and reduced-motion support.
@@ -69,6 +69,14 @@ No API key, account, backend service or environment variables are required.
 
 Text inputs retain their normal editing shortcuts. Playback/nudge shortcuts apply when focus is outside text fields and interactive buttons. Drag interactions also have numeric or range-control alternatives.
 
+### Custom templates
+
+In **Style**, choose a built-in caption behavior and adjust the font, size, colors and placement. Select **Save as template**, give it a name, then reuse it from **Your templates** on any video. Applying a template is undoable. To revise one, apply it, adjust the controls and save it under a new name; delete the old preset if needed.
+
+Custom templates are **free for now**. Paid access is deferred; there are no billing or account requirements. The small template library is stored separately in browser localStorage, survives replacing/forgetting the current project, and is removed by clearing site data. It belongs to the same browser profile and site address as autosave. Save failures leave the previous library unchanged.
+
+Notifications fade after five seconds. Processing progress and autosave failures stay visible until resolved. Destructive actions use styled, keyboard-accessible confirmation dialogs; browsers still control their own leave-page warning when work is unsaved.
+
 ## Local autosave
 
 Subslime uses [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API) to store the current source video and editing state in your browser. The video is written once when you open a new project; subsequent edits update only a smaller state record.
@@ -89,7 +97,7 @@ Browser cleanup, storage eviction and ending a private-browsing session can remo
 | --------------- | ------------------------------------------------------------------------ |
 | File size       | Up to 200 MiB (displayed as 200 MB in the interface)                     |
 | Duration        | Up to 3 minutes; initially aimed at 15-second–3-minute clips             |
-| Resolution      | Up to 2,073,600 pixels, equivalent to 1080p in either orientation        |
+| Resolution      | No fixed resolution cap; decoding and memory depend on your browser      |
 | Import          | MP4, WebM, MOV and M4V; actual support depends on the codecs and browser |
 | Transcription   | English, using Whisper tiny; generated text and timing need review       |
 | Video export    | H.264 MP4 with AAC audio when the source has a supported audio track     |
@@ -139,6 +147,7 @@ src/
     editor/                 # Editor screen, history store, timeline and sidebar
     landing/                # Landing page and demonstrations
     projects/               # Browser-local project storage and validation
+    templates/              # Named custom caption styles and local library
     transcription/          # Speech worker and its client
     video/                  # Import, FFmpeg processing, downloads and video types
 tests/

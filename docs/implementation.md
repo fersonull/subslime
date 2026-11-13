@@ -55,3 +55,13 @@ Returning home keeps the project and offers Resume editing and Forget saved proj
 The original slime is reworked as a square C and mirrored C, with square eyes and a rectangular mouth. The favicon, shared brand, README banner and full-page drop overlay use the same mark. Nested file-drag entries use a depth counter to avoid flicker; drop, leaving the page, drag-end, Escape and window blur clear the feedback. Text drags keep normal browser behavior. The overlay has live status text, does not steal focus and does not intercept the underlying drop target.
 
 Verification includes native browser IndexedDB restoration of the video, words, style and playhead; quota failure after a replacement video write; blocked storage; stale-tab retries; forgetting saved data; and desktop/phone overlay screenshots. Storage-data validation is also unit-tested.
+
+## Custom templates, notifications and upload resolution
+
+Uploads no longer reject videos above 1080p. File-size, duration and codec checks remain. Full-resolution rendering still runs in FFmpeg.wasm and can exceed a device's memory; removal of the upload cap does not guarantee high-resolution export on every device.
+
+Named custom templates store a complete caption style, including its built-in rendering behavior, in a versioned localStorage library. The library is small and independent of the IndexedDB video project, so replacing or forgetting a project preserves templates. The same caption-style validator protects both persistence boundaries. Invalid data or failed writes leave the previous library unchanged. Users create, apply and delete templates in Style; applying uses the existing undoable editor commit. Custom templates are free at present. Paid entitlement and billing are deferred, with no placeholder gating or billing dependencies.
+
+App confirmations use a shared styled HTML dialog with a promise result, focus containment, a focused Cancel action, and Escape cancellation. Project replacement, forgetting, caption regeneration and custom-template deletion share it. The browser's unsaved-work leave warning remains browser-controlled. Temporary upload/editor notifications use a shared toast that starts fading after five seconds and unmounts after 250 ms; reduced-motion settings remove the fade. Processing/cancellation controls and storage failures remain persistent.
+
+Regression checks cover accepting 4K metadata, custom-template validation and storage errors, toast dismissal, modal cancellation/focus, and saving/reusing/deleting templates across refresh and project removal. Real high-resolution exports beyond 1080p and physical-device limits have not been benchmarked.

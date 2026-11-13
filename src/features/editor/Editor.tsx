@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowUpRight,
-  Check,
   ChevronDown,
   Download,
   LoaderCircle,
@@ -11,9 +10,10 @@ import {
   Redo2,
   SkipBack,
   Undo2,
-  X,
 } from "lucide-react";
 import { Brand } from "../../components/Brand";
+import { Toast } from "../../components/Toast";
+import { useConfirm } from "../../components/ConfirmDialog";
 import { Caption } from "../captions/components/Caption";
 import { Sidebar } from "./components/Sidebar";
 import { Timeline } from "./components/Timeline";
@@ -43,6 +43,7 @@ export function Editor({
   onTimeChange: (time: number) => void;
   saveLabel: string;
 }) {
+  const confirm = useConfirm();
   const { project, past, future, selectedId, commit, undo, redo } = useEditor();
   const video = useRef<HTMLVideoElement>(null),
     frame = useRef<HTMLDivElement>(null);
@@ -177,9 +178,12 @@ export function Editor({
     if (
       kind === "transcribe" &&
       project.words.length &&
-      !window.confirm(
-        "Replace all current captions with a new transcription? You can undo this after generation.",
-      )
+      !(await confirm({
+        title: "Regenerate captions?",
+        message:
+          "Replace all current captions with a new transcription? You can undo this after generation.",
+        action: "Regenerate captions",
+      }))
     )
       return;
     const abort = new AbortController();
@@ -363,23 +367,14 @@ export function Editor({
         </div>
       </header>
       {(error || notice) && (
-        <div
-          className={`editor-message ${error ? "error-message" : ""}`}
-          role={error ? "alert" : "status"}
-        >
-          {!error && <Check size={16} />}
-          <span>{error || notice}</span>
-          <button
-            className="icon-button"
-            aria-label="Dismiss message"
-            onClick={() => {
-              setError("");
-              setNotice("");
-            }}
-          >
-            <X size={16} />
-          </button>
-        </div>
+        <Toast
+          message={error || notice}
+          error={!!error}
+          dismiss={() => {
+            setError("");
+            setNotice("");
+          }}
+        />
       )}
       {busy && (
         <div className="processing-banner" role="status">

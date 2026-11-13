@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CustomTemplates } from "../../templates/CustomTemplates";
 import {
   Check,
   CircleCheck,
@@ -363,6 +364,7 @@ export function Sidebar({
               </button>
             ))}
           </div>
+          <CustomTemplates busy={busy} onError={onError} />
           <h3>Typography</h3>
           <label>
             Font

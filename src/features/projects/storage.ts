@@ -1,5 +1,5 @@
 import { validWords } from "../captions/captions";
-import { templates, type EditorProject } from "../captions/model";
+import { isCaptionStyle, type EditorProject } from "../captions/model";
 
 export type ProjectSnapshot = {
   project: EditorProject;
@@ -45,26 +45,7 @@ export function validateSnapshot(snapshot: ProjectSnapshot): void {
     project.duration <= 0 ||
     project.duration > 180 ||
     !validWords(project.words, project.duration) ||
-    !style ||
-    !templates.some((template) => template.id === style.template) ||
-    !["Noto Sans", "Noto Sans Mono"].includes(style.fontFamily) ||
-    ![style.textColor, style.backgroundColor, style.outlineColor].every(
-      (color) => /^#[\da-f]{6}$/i.test(color),
-    ) ||
-    ![
-      style.fontSize,
-      style.outlineWidth,
-      style.positionX,
-      style.positionY,
-    ].every(Number.isFinite) ||
-    style.fontSize < 20 ||
-    style.fontSize > 140 ||
-    style.outlineWidth < 0 ||
-    style.outlineWidth > 20 ||
-    style.positionX < 5 ||
-    style.positionX > 95 ||
-    style.positionY < 5 ||
-    style.positionY > 95 ||
+    !isCaptionStyle(style) ||
     !Number.isFinite(playhead) ||
     playhead < 0 ||
     playhead > project.duration ||

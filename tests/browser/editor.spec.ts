@@ -3,6 +3,123 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 
 const fixtureFolder = "tests/fixtures/generated";
 
+test("notifications disappear and project confirmations use a custom dialog", async ({
+  page,
+}) => {
+  const bytes = await fixture(page);
+  await page.getByLabel("Choose a video file").setInputFiles({
+    name: "bad.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("bad"),
+  });
+  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0, { timeout: 9000 });
+  await page.getByLabel("Choose a video file").setInputFiles({
+    name: "original.webm",
+    mimeType: "video/webm",
+    buffer: bytes,
+  });
+  await expect(
+    page.getByText("Saved on this device", { exact: true }),
+  ).toBeVisible();
+  await page.getByLabel("Choose a video file").setInputFiles({
+    name: "next.webm",
+    mimeType: "video/webm",
+    buffer: bytes,
+  });
+  await expect(
+    page.getByRole("dialog", { name: "Replace current project?" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Cancel", exact: true }),
+  ).toBeFocused();
+  await page.screenshot({ path: "test-results/confirm-project.png" });
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.getByText("original.webm", { exact: true })).toBeVisible();
+});
+
+test("custom templates save, restore, apply across projects and delete", async ({
+  page,
+}) => {
+  const bytes = await fixture(page);
+  await page.getByLabel("Choose a video file").setInputFiles({
+    name: "styles.webm",
+    mimeType: "video/webm",
+    buffer: bytes,
+  });
+  await page.getByRole("tab", { name: "Style", exact: true }).click();
+  await page.getByRole("combobox").selectOption("Noto Sans Mono");
+  await page.getByLabel("Caption vertical position").fill("60");
+  await page.getByLabel("Caption text color").fill("#33aa66");
+  await page
+    .getByRole("button", { name: "Save as template", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Save template", exact: true })
+    .click();
+  await expect(page.getByRole("dialog").getByRole("alert")).toHaveText(
+    "Enter a template name.",
+  );
+  await page.getByLabel("Template name").fill("My green captions");
+  await page
+    .getByRole("button", { name: "Save template", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Apply My green captions", exact: true }),
+  ).toBeVisible();
+  await page.reload();
+  await page.getByRole("tab", { name: "Style", exact: true }).click();
+  await page.getByRole("button", { name: "Minimal Box", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Apply My green captions", exact: true })
+    .click();
+  await expect(page.getByLabel("Caption text color")).toHaveValue("#33aa66");
+  await expect(page.getByLabel("Caption vertical position")).toHaveValue("60");
+  await page
+    .getByRole("button", { name: "Return to home", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Forget saved project", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Forget project", exact: true })
+    .click();
+  await page.getByLabel("Choose a video file").setInputFiles({
+    name: "another.webm",
+    mimeType: "video/webm",
+    buffer: bytes,
+  });
+  await page.getByRole("tab", { name: "Style", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Apply My green captions", exact: true })
+    .click();
+  await expect(page.getByRole("combobox")).toHaveValue("Noto Sans Mono");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page
+    .getByRole("region", { name: "Custom templates" })
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: "test-results/custom-templates-phone.png",
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", { name: "Delete My green captions", exact: true })
+    .click();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).not.toBeVisible();
+  await page
+    .getByRole("button", { name: "Delete My green captions", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Delete template", exact: true })
+    .click();
+  await page.reload();
+  await page.getByRole("tab", { name: "Style", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Apply My green captions", exact: true }),
+  ).toHaveCount(0);
+});
+
 test("timeline scrubbing does not select text, including outside the timeline", async ({
   page,
 }) => {
@@ -372,8 +489,10 @@ test("Whisper generates word timestamps from synthesized English speech and canc
   expect(transcript).toContain("make every word count");
   await page.screenshot({ path: "test-results/editor-transcribed.png" });
   const before = await inputs.count();
-  page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Regenerate", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Regenerate captions", exact: true })
+    .click();
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(
     page.getByText("Processing cancelled. Your captions are unchanged."),
@@ -398,13 +517,11 @@ test("autosave restores the video, captions, styling and playhead after refresh"
   page,
 }) => {
   const bytes = await fixture(page);
-  await page
-    .getByLabel("Choose a video file")
-    .setInputFiles({
-      name: "resume.webm",
-      mimeType: "video/webm",
-      buffer: bytes,
-    });
+  await page.getByLabel("Choose a video file").setInputFiles({
+    name: "resume.webm",
+    mimeType: "video/webm",
+    buffer: bytes,
+  });
   await page.getByLabel("Add caption", { exact: true }).click();
   await page.getByLabel("Caption 1 text").fill("Remember me");
   await page.getByLabel("Caption 1 text").press("Enter");
@@ -442,9 +559,11 @@ test("autosave restores the video, captions, styling and playhead after refresh"
   await page
     .getByRole("button", { name: "Return to home", exact: true })
     .click();
-  page.once("dialog", (dialog) => dialog.accept());
   await page
     .getByRole("button", { name: "Forget saved project", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Forget project", exact: true })
     .click();
   await page.reload();
   await expect(
@@ -512,13 +631,11 @@ test("storage failure is visible and does not prevent editing", async ({
     });
   });
   const bytes = await fixture(page);
-  await page
-    .getByLabel("Choose a video file")
-    .setInputFiles({
-      name: "private.webm",
-      mimeType: "video/webm",
-      buffer: bytes,
-    });
+  await page.getByLabel("Choose a video file").setInputFiles({
+    name: "private.webm",
+    mimeType: "video/webm",
+    buffer: bytes,
+  });
   await expect(page.getByRole("alert")).toContainText("Autosave unavailable");
   await page.getByLabel("Add caption", { exact: true }).click();
   await expect(page.getByLabel("Caption 1 text")).toHaveValue("word");
@@ -531,13 +648,11 @@ test("a failed video save keeps the previous project intact", async ({
   page,
 }) => {
   const bytes = await fixture(page);
-  await page
-    .getByLabel("Choose a video file")
-    .setInputFiles({
-      name: "original.webm",
-      mimeType: "video/webm",
-      buffer: bytes,
-    });
+  await page.getByLabel("Choose a video file").setInputFiles({
+    name: "original.webm",
+    mimeType: "video/webm",
+    buffer: bytes,
+  });
   await page.getByLabel("Add caption", { exact: true }).click();
   await page.getByLabel("Caption 1 text").fill("Keep this");
   await page.getByLabel("Caption 1 text").press("Enter");
@@ -552,14 +667,14 @@ test("a failed video save keeps the previous project intact", async ({
       return put.call(this, value, key);
     };
   });
-  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByLabel("Choose a video file").setInputFiles({
+    name: "replacement.webm",
+    mimeType: "video/webm",
+    buffer: bytes,
+  });
   await page
-    .getByLabel("Choose a video file")
-    .setInputFiles({
-      name: "replacement.webm",
-      mimeType: "video/webm",
-      buffer: bytes,
-    });
+    .getByRole("button", { name: "Replace project", exact: true })
+    .click();
   await expect(page.getByRole("alert")).toContainText(
     "Browser storage is full",
   );
@@ -574,13 +689,11 @@ test("a stale tab cannot overwrite a project opened in another tab", async ({
   context,
 }) => {
   const bytes = await fixture(page);
-  await page
-    .getByLabel("Choose a video file")
-    .setInputFiles({
-      name: "first.webm",
-      mimeType: "video/webm",
-      buffer: bytes,
-    });
+  await page.getByLabel("Choose a video file").setInputFiles({
+    name: "first.webm",
+    mimeType: "video/webm",
+    buffer: bytes,
+  });
   await page.getByLabel("Add caption", { exact: true }).click();
   await expect(
     page.getByText("Saved on this device", { exact: true }),
@@ -588,14 +701,14 @@ test("a stale tab cannot overwrite a project opened in another tab", async ({
   const newer = await context.newPage();
   await newer.goto("/");
   await expect(newer.getByText("first.webm", { exact: true })).toBeVisible();
-  newer.once("dialog", (dialog) => dialog.accept());
+  await newer.getByLabel("Choose a video file").setInputFiles({
+    name: "second.webm",
+    mimeType: "video/webm",
+    buffer: bytes,
+  });
   await newer
-    .getByLabel("Choose a video file")
-    .setInputFiles({
-      name: "second.webm",
-      mimeType: "video/webm",
-      buffer: bytes,
-    });
+    .getByRole("button", { name: "Replace project", exact: true })
+    .click();
   await expect(
     newer.getByText("Saved on this device", { exact: true }),
   ).toBeVisible();
@@ -679,8 +792,10 @@ test("caption fetch failures explain how to recover and preserve existing edits"
   await page.route("**/ffmpeg/ffmpeg-core.js", (route) =>
     route.abort("connectionrefused"),
   );
-  page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Regenerate", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Regenerate captions", exact: true })
+    .click();
   await expect(page.getByRole("alert")).toContainText("local video engine");
   await expect(page.getByRole("alert")).toContainText("server");
   await expect(page.getByLabel("Caption 1 text")).toHaveValue("word");
@@ -689,8 +804,10 @@ test("caption fetch failures explain how to recover and preserve existing edits"
   await page.route("https://huggingface.co/**", (route) =>
     route.abort("internetdisconnected"),
   );
-  page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Regenerate", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Regenerate captions", exact: true })
+    .click();
   await expect(page.getByRole("alert")).toContainText("speech model", {
     timeout: 60000,
   });
