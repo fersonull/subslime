@@ -52,10 +52,6 @@ export async function readVideo(file: File): Promise<VideoSource> {
       throw new Error(
         "Choose a video up to 3 minutes long for this initial version.",
       );
-    if (video.videoWidth * video.videoHeight > 1920 * 1080)
-      throw new Error(
-        "Choose a video up to 1080p to keep browser memory use manageable.",
-      );
     return {
       file,
       url,
