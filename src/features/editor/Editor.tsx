@@ -27,6 +27,8 @@ import { useEditor } from "./store";
 import { download, processMedia } from "../video/processing";
 import { transcribe } from "../transcription/transcribe";
 import type { VideoSource } from "../video/types";
+import { TemplateBuilder } from "../templates/TemplateBuilder";
+import type { CustomTemplate } from "../templates/storage";
 
 export function Editor({
   source,
@@ -44,6 +46,10 @@ export function Editor({
   saveLabel: string;
 }) {
   const confirm = useConfirm();
+  const [builder, setBuilder] = useState<CustomTemplate | null | undefined>(
+    undefined,
+  );
+  const [templateRevision, setTemplateRevision] = useState(0);
   const { project, past, future, selectedId, commit, undo, redo } = useEditor();
   const video = useRef<HTMLVideoElement>(null),
     frame = useRef<HTMLDivElement>(null);
@@ -88,9 +94,10 @@ export function Editor({
   useEffect(() => {
     const element = frame.current;
     if (!element) return;
-    const observer = new ResizeObserver((entries) =>
-      setHeight(entries[0].contentRect.height),
-    );
+    const observer = new ResizeObserver((entries) => {
+      if (entries[0].contentRect.height > 0)
+        setHeight(entries[0].contentRect.height);
+    });
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
@@ -107,6 +114,8 @@ export function Editor({
   }, [playing]);
   useEffect(() => {
     const keydown = (e: KeyboardEvent) => {
+      if (builder !== undefined || document.querySelector("dialog[open]"))
+        return;
       if (
         (e.target as HTMLElement).closest(
           "input,textarea,select,[contenteditable]",
@@ -155,6 +164,7 @@ export function Editor({
     window.addEventListener("keydown", keydown);
     return () => window.removeEventListener("keydown", keydown);
   }, [
+    builder,
     busy,
     time,
     selectedId,
@@ -279,214 +289,233 @@ export function Editor({
   }
 
   return (
-    <div className="editor-shell">
-      <header className="editor-header">
-        <button
-          className="editor-home"
-          aria-label="Return to home"
-          disabled={busy}
-          onClick={exit}
-        >
-          <ArrowLeft size={18} />
-          <Brand />
-        </button>
-        <div className="file-info">
-          <strong title={source.file.name}>{source.file.name}</strong>
-          <span>
-            {source.width} × {source.height} · {displayTime(source.duration)}
-          </span>
-        </div>
-        <div className="editor-header-actions">
-          <button
-            className="icon-button"
-            disabled={!past.length || busy}
-            onClick={undo}
-            aria-label="Undo"
-            title="Undo (Ctrl/⌘ Z)"
-          >
-            <Undo2 size={19} />
-          </button>
-          <button
-            className="icon-button"
-            disabled={!future.length || busy}
-            onClick={redo}
-            aria-label="Redo"
-            title="Redo (Ctrl/⌘ Shift Z)"
-          >
-            <Redo2 size={19} />
-          </button>
-          <span className="toolbar-divider" />
-          <button
-            className="button secondary small replace-video"
-            disabled={busy}
-            onClick={chooseVideo}
-          >
-            Change video <ArrowUpRight size={14} />
-          </button>
-          <div className="export-menu-anchor" ref={exportMenu}>
-            <button
-              className="button small"
-              disabled={busy || !project.words.length}
-              onClick={() => setMenu(!menu)}
-              aria-expanded={menu}
-              aria-controls="export-options"
-            >
-              <Download size={15} /> Export <ChevronDown size={14} />
-            </button>
-            {menu && (
-              <div className="export-menu" id="export-options">
-                <h3>Take your words with you.</h3>
-                <button onClick={() => void runJob("export")}>
-                  <span>
-                    <strong>Captioned video</strong>
-                    <small>MP4 · original audio · local render</small>
-                  </span>
-                  <Download size={17} />
-                </button>
-                <button onClick={() => subtitles("srt")}>
-                  <span>
-                    <strong>Subtitle file</strong>
-                    <small>SRT · individual word timings</small>
-                  </span>
-                  <span>.srt</span>
-                </button>
-                <button onClick={() => subtitles("vtt")}>
-                  <span>
-                    <strong>Web captions</strong>
-                    <small>VTT · individual word timings</small>
-                  </span>
-                  <span>.vtt</span>
-                </button>
-                <p>
-                  MP4 export can be slow and use significant memory. Keep this
-                  tab open.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
-      {(error || notice) && (
-        <Toast
-          message={error || notice}
-          error={!!error}
-          dismiss={() => {
-            setError("");
-            setNotice("");
+    <>
+      {builder !== undefined && (
+        <TemplateBuilder
+          template={builder}
+          close={() => setBuilder(undefined)}
+          save={(template) => {
+            commit((p) => ({ ...p, style: template.style }));
+            setTemplateRevision((value) => value + 1);
+            setBuilder(undefined);
           }}
         />
       )}
-      {busy && (
-        <div className="processing-banner" role="status">
-          <LoaderCircle size={17} className="spin" />
-          <span>{status || "Preparing…"}</span>
+      <div className="editor-shell" hidden={builder !== undefined}>
+        <header className="editor-header">
           <button
-            onClick={() => {
-              controller.current?.abort();
-              setStatus("Cancelling…");
-            }}
+            className="editor-home"
+            aria-label="Return to home"
+            disabled={busy}
+            onClick={exit}
           >
-            Cancel
+            <ArrowLeft size={18} />
+            <Brand />
           </button>
-        </div>
-      )}
-      <div className="editor-main">
-        <Sidebar
-          time={time}
-          seek={seek}
-          busy={busy}
-          generate={() => void runJob("transcribe")}
-          onError={setError}
-          saveLabel={saveLabel}
-        />
-        <section className="preview-panel" aria-label="Video preview">
-          <div className="preview-topline">
-            <span>Preview</span>
+          <div className="file-info">
+            <strong title={source.file.name}>{source.file.name}</strong>
             <span>
-              Fit · {source.height > source.width ? "Portrait" : "Landscape"}
+              {source.width} × {source.height} · {displayTime(source.duration)}
             </span>
           </div>
-          <div className="preview-well">
-            <div
-              className="video-frame"
-              ref={frame}
-              style={{ aspectRatio: `${source.width} / ${source.height}` }}
-              onPointerMove={dragPosition}
-              onPointerUp={() => finishPosition(false)}
-              onPointerCancel={() => finishPosition(true)}
-            >
-              <video
-                ref={video}
-                src={source.url}
-                playsInline
-                preload="auto"
-                onLoadedMetadata={() => seek(initialTime)}
-                onPlay={() => setPlaying(true)}
-                onPause={() => setPlaying(false)}
-                onEnded={() => setPlaying(false)}
-                onTimeUpdate={() => {
-                  if (video.current) {
-                    setTime(video.current.currentTime);
-                    onTimeChange(video.current.currentTime);
-                  }
-                }}
-                onSeeked={() => {
-                  if (video.current) onTimeChange(video.current.currentTime);
-                }}
-                onError={() =>
-                  setError("The video could not be played. Try an H.264 MP4.")
-                }
-                onClick={togglePlay}
-                aria-label="Uploaded video preview"
-              />
-              <Caption
-                words={project.words}
-                time={time}
-                style={{ ...project.style, ...position }}
-                previewHeight={height}
-                onPointerDown={
-                  busy
-                    ? undefined
-                    : (e) => {
-                        e.stopPropagation();
-                        e.currentTarget.setPointerCapture(e.pointerId);
-                        positionDrag.current = { pointer: e.pointerId };
-                      }
-                }
-              />
-            </div>
-          </div>
-          <div className="preview-controls">
+          <div className="editor-header-actions">
             <button
               className="icon-button"
-              aria-label="Seek to start"
-              onClick={() => seek(0)}
+              disabled={!past.length || busy}
+              onClick={undo}
+              aria-label="Undo"
+              title="Undo (Ctrl/⌘ Z)"
             >
-              <SkipBack size={18} />
+              <Undo2 size={19} />
             </button>
             <button
-              className="play-button"
-              aria-label={playing ? "Pause video" : "Play video"}
-              onClick={togglePlay}
+              className="icon-button"
+              disabled={!future.length || busy}
+              onClick={redo}
+              aria-label="Redo"
+              title="Redo (Ctrl/⌘ Shift Z)"
             >
-              {playing ? <Pause size={19} /> : <Play size={19} />}
+              <Redo2 size={19} />
             </button>
-            <span className="time-display">
-              {displayTime(time)} <span>/ {displayTime(source.duration)}</span>
-            </span>
-            <input
-              type="range"
-              min="0"
-              max={source.duration}
-              step="0.01"
-              value={time}
-              onChange={(e) => seek(Number(e.target.value))}
-              aria-label="Video playhead"
-            />
+            <span className="toolbar-divider" />
+            <button
+              className="button secondary small replace-video"
+              disabled={busy}
+              onClick={chooseVideo}
+            >
+              Change video <ArrowUpRight size={14} />
+            </button>
+            <div className="export-menu-anchor" ref={exportMenu}>
+              <button
+                className="button small"
+                disabled={busy || !project.words.length}
+                onClick={() => setMenu(!menu)}
+                aria-expanded={menu}
+                aria-controls="export-options"
+              >
+                <Download size={15} /> Export <ChevronDown size={14} />
+              </button>
+              {menu && (
+                <div className="export-menu" id="export-options">
+                  <h3>Take your words with you.</h3>
+                  <button onClick={() => void runJob("export")}>
+                    <span>
+                      <strong>Captioned video</strong>
+                      <small>MP4 · original audio · local render</small>
+                    </span>
+                    <Download size={17} />
+                  </button>
+                  <button onClick={() => subtitles("srt")}>
+                    <span>
+                      <strong>Subtitle file</strong>
+                      <small>SRT · individual word timings</small>
+                    </span>
+                    <span>.srt</span>
+                  </button>
+                  <button onClick={() => subtitles("vtt")}>
+                    <span>
+                      <strong>Web captions</strong>
+                      <small>VTT · individual word timings</small>
+                    </span>
+                    <span>.vtt</span>
+                  </button>
+                  <p>
+                    MP4 export can be slow and use significant memory. Keep this
+                    tab open.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
-        </section>
+        </header>
+        {(error || notice) && (
+          <Toast
+            message={error || notice}
+            error={!!error}
+            dismiss={() => {
+              setError("");
+              setNotice("");
+            }}
+          />
+        )}
+        {busy && (
+          <div className="processing-banner" role="status">
+            <LoaderCircle size={17} className="spin" />
+            <span>{status || "Preparing…"}</span>
+            <button
+              onClick={() => {
+                controller.current?.abort();
+                setStatus("Cancelling…");
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+        <div className="editor-main">
+          <Sidebar
+            time={time}
+            seek={seek}
+            busy={busy}
+            generate={() => void runJob("transcribe")}
+            onError={setError}
+            saveLabel={saveLabel}
+            buildTemplate={(template) => {
+              video.current?.pause();
+              setBuilder(template);
+            }}
+            templateRevision={templateRevision}
+          />
+          <section className="preview-panel" aria-label="Video preview">
+            <div className="preview-topline">
+              <span>Preview</span>
+              <span>
+                Fit · {source.height > source.width ? "Portrait" : "Landscape"}
+              </span>
+            </div>
+            <div className="preview-well">
+              <div
+                className="video-frame"
+                ref={frame}
+                style={{ aspectRatio: `${source.width} / ${source.height}` }}
+                onPointerMove={dragPosition}
+                onPointerUp={() => finishPosition(false)}
+                onPointerCancel={() => finishPosition(true)}
+              >
+                <video
+                  ref={video}
+                  src={source.url}
+                  playsInline
+                  preload="auto"
+                  onLoadedMetadata={() => seek(initialTime)}
+                  onPlay={() => setPlaying(true)}
+                  onPause={() => setPlaying(false)}
+                  onEnded={() => setPlaying(false)}
+                  onTimeUpdate={() => {
+                    if (video.current) {
+                      setTime(video.current.currentTime);
+                      onTimeChange(video.current.currentTime);
+                    }
+                  }}
+                  onSeeked={() => {
+                    if (video.current) onTimeChange(video.current.currentTime);
+                  }}
+                  onError={() =>
+                    setError("The video could not be played. Try an H.264 MP4.")
+                  }
+                  onClick={togglePlay}
+                  aria-label="Uploaded video preview"
+                />
+                <Caption
+                  words={project.words}
+                  time={time}
+                  style={{ ...project.style, ...position }}
+                  previewHeight={height}
+                  onPointerDown={
+                    busy
+                      ? undefined
+                      : (e) => {
+                          e.stopPropagation();
+                          e.currentTarget.setPointerCapture(e.pointerId);
+                          positionDrag.current = { pointer: e.pointerId };
+                        }
+                  }
+                />
+              </div>
+            </div>
+            <div className="preview-controls">
+              <button
+                className="icon-button"
+                aria-label="Seek to start"
+                onClick={() => seek(0)}
+              >
+                <SkipBack size={18} />
+              </button>
+              <button
+                className="play-button"
+                aria-label={playing ? "Pause video" : "Play video"}
+                onClick={togglePlay}
+              >
+                {playing ? <Pause size={19} /> : <Play size={19} />}
+              </button>
+              <span className="time-display">
+                {displayTime(time)}{" "}
+                <span>/ {displayTime(source.duration)}</span>
+              </span>
+              <input
+                type="range"
+                min="0"
+                max={source.duration}
+                step="0.01"
+                value={time}
+                onChange={(e) => seek(Number(e.target.value))}
+                aria-label="Video playhead"
+              />
+            </div>
+          </section>
+        </div>
+        <Timeline time={time} seek={seek} busy={busy} />
       </div>
-      <Timeline time={time} seek={seek} busy={busy} />
-    </div>
+    </>
   );
 }

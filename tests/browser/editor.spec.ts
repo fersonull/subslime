@@ -33,12 +33,43 @@ test("notifications disappear and project confirmations use a custom dialog", as
   await expect(
     page.getByRole("button", { name: "Cancel", exact: true }),
   ).toBeFocused();
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    const cancel = (await page
+      .getByRole("button", { name: "Cancel", exact: true })
+      .boundingBox())!;
+    const replace = (await page
+      .getByRole("button", { name: "Replace project", exact: true })
+      .boundingBox())!;
+    const icon = (await page.locator(".confirm-dialog > img").boundingBox())!;
+    const title = (await page.locator("#confirmation-title").boundingBox())!;
+    expect(replace.x - (cancel.x + cancel.width)).toBeGreaterThanOrEqual(11);
+    expect(title.y - (icon.y + icon.height)).toBeGreaterThanOrEqual(23);
+    expect(
+      await page
+        .getByRole("button", { name: "Cancel", exact: true })
+        .evaluate((button) => getComputedStyle(button).boxShadow),
+    ).toContain("inset");
+    await page
+      .getByRole("button", { name: "Replace project", exact: true })
+      .hover();
+    expect(
+      (await page
+        .getByRole("button", { name: "Replace project", exact: true })
+        .boundingBox())!.width,
+    ).toBeCloseTo(replace.width, 1);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  }
   await page.screenshot({ path: "test-results/confirm-project.png" });
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(page.getByText("original.webm", { exact: true })).toBeVisible();
 });
 
-test("custom templates save, restore, apply across projects and delete", async ({
+test("template builder creates independent designs, edits them and exports the result", async ({
   page,
 }) => {
   const bytes = await fixture(page);
@@ -47,34 +78,144 @@ test("custom templates save, restore, apply across projects and delete", async (
     mimeType: "video/webm",
     buffer: bytes,
   });
+  await page.getByLabel("Add caption", { exact: true }).click();
+  await page.getByLabel("Caption 1 text").fill("Make");
+  await page.getByLabel("Caption 1 text").press("Enter");
   await page.getByRole("tab", { name: "Style", exact: true }).click();
-  await page.getByRole("combobox").selectOption("Noto Sans Mono");
-  await page.getByLabel("Caption vertical position").fill("60");
-  await page.getByLabel("Caption text color").fill("#33aa66");
+  await page.getByLabel("Caption text color").fill("#123456");
   await page
-    .getByRole("button", { name: "Save as template", exact: true })
+    .getByRole("button", { name: "Create template", exact: true })
     .click();
-  await page
-    .getByRole("button", { name: "Save template", exact: true })
-    .click();
-  await expect(page.getByRole("dialog").getByRole("alert")).toHaveText(
-    "Enter a template name.",
+  await expect(
+    page.getByRole("heading", { name: "Build your own template" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Text color", { exact: true })).toHaveValue(
+    "#ffffff",
   );
-  await page.getByLabel("Template name").fill("My green captions");
+  await expect(
+    page.getByRole("button", { name: "Classic Pop", exact: true }),
+  ).not.toBeVisible();
+  const controlsY = (await page
+    .locator(".builder-controls fieldset")
+    .first()
+    .boundingBox())!.y;
   await page
     .getByRole("button", { name: "Save template", exact: true })
     .click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Give your template a name",
+  );
+  expect(
+    (await page.locator(".builder-controls fieldset").first().boundingBox())!.y,
+  ).toBeCloseTo(controlsY, 1);
+  await page.getByLabel("Template name").fill("My green captions");
+  await page.getByLabel("Word display").selectOption("phrase");
+  await page.getByLabel("Words per phrase").fill("3");
+  await page.getByLabel("Active word treatment").selectOption("text");
+  await page.getByLabel("Highlight color").fill("#33aa66");
+  await page.getByLabel("Template font").selectOption("Noto Sans Mono");
+  await page.getByLabel("Vertical position", { exact: true }).fill("60");
+  await page.getByLabel("Uppercase", { exact: true }).check();
+  await page.getByLabel("Italic", { exact: true }).check();
+  await page.getByLabel("Letter spacing", { exact: true }).fill("2");
+  await page.getByLabel("Rotation", { exact: true }).fill("5");
+  await page.getByLabel("Template preview time").fill("1.0");
+  await expect(page.locator(".builder-canvas .active-word")).toHaveText(
+    "EVERY",
+  );
+  await page.screenshot({
+    path: "test-results/template-builder-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "test-results/template-builder-phone.png",
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", { name: "Back to video", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Build your own template" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Save template", exact: true })
+    .click();
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await expect(
     page.getByRole("button", { name: "Apply My green captions", exact: true }),
   ).toBeVisible();
   await page.reload();
   await page.getByRole("tab", { name: "Style", exact: true }).click();
-  await page.getByRole("button", { name: "Minimal Box", exact: true }).click();
   await page
-    .getByRole("button", { name: "Apply My green captions", exact: true })
+    .getByRole("button", { name: "Edit My green captions", exact: true })
     .click();
-  await expect(page.getByLabel("Caption text color")).toHaveValue("#33aa66");
-  await expect(page.getByLabel("Caption vertical position")).toHaveValue("60");
+  await expect(page.getByLabel("Template font")).toHaveValue("Noto Sans Mono");
+  await expect(page.getByLabel("Words per phrase")).toHaveValue("3");
+  await page.getByLabel("Shadow", { exact: true }).fill("2");
+  await page
+    .getByRole("button", { name: "Save template", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Seek to start", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Export", exact: true }).click();
+  const pending = page.waitForEvent("download", { timeout: 180000 });
+  await page.getByRole("button", { name: /Captioned video/ }).click();
+  const download = await pending;
+  await download.saveAs("test-results/custom-template.mp4");
+  const output = await readFile((await download.path())!);
+  await page.route("**/custom-output.mp4", (route) =>
+    route.fulfill({ body: output, contentType: "video/mp4" }),
+  );
+  const rendered = await page.evaluate(async () => {
+    const url = URL.createObjectURL(
+      await (await fetch("/custom-output.mp4")).blob(),
+    );
+    const video = document.createElement("video");
+    document.body.append(video);
+    video.src = url;
+    await new Promise<void>((resolve, reject) => {
+      video.onloadeddata = () => resolve();
+      video.onerror = () => reject(new Error("Custom export is not playable"));
+    });
+    const presented = new Promise<void>((resolve) =>
+      video.requestVideoFrameCallback(() => resolve()),
+    );
+    video.currentTime = 0.2;
+    await new Promise<void>((resolve) => {
+      video.onseeked = () => resolve();
+    });
+    await presented;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(video, 0, 0);
+    const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let count = 0;
+    for (let i = 0; i < pixels.length; i += 4)
+      if (
+        pixels[i + 1] > 110 &&
+        pixels[i + 1] > pixels[i] * 1.6 &&
+        pixels[i + 1] > pixels[i + 2] * 1.3
+      )
+        count++;
+    URL.revokeObjectURL(url);
+    video.remove();
+    return { green: count, frame: canvas.toDataURL() };
+  });
+  await writeFile(
+    "test-results/custom-template-frame.png",
+    Buffer.from(rendered.frame.split(",")[1], "base64"),
+  );
+  expect(rendered.green).toBeGreaterThan(30);
   await page
     .getByRole("button", { name: "Return to home", exact: true })
     .click();
@@ -93,20 +234,11 @@ test("custom templates save, restore, apply across projects and delete", async (
   await page
     .getByRole("button", { name: "Apply My green captions", exact: true })
     .click();
-  await expect(page.getByRole("combobox")).toHaveValue("Noto Sans Mono");
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page
-    .getByRole("region", { name: "Custom templates" })
-    .scrollIntoViewIfNeeded();
-  await page.screenshot({
-    path: "test-results/custom-templates-phone.png",
-    fullPage: true,
-  });
+  await expect(page.getByLabel("Caption vertical position")).toHaveValue("60");
   await page
     .getByRole("button", { name: "Delete My green captions", exact: true })
     .click();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog")).not.toBeVisible();
   await page
     .getByRole("button", { name: "Delete My green captions", exact: true })
     .click();

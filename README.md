@@ -71,7 +71,9 @@ Text inputs retain their normal editing shortcuts. Playback/nudge shortcuts appl
 
 ### Custom templates
 
-In **Style**, choose a built-in caption behavior and adjust the font, size, colors and placement. Select **Save as template**, give it a name, then reuse it from **Your templates** on any video. Applying a template is undoable. To revise one, apply it, adjust the controls and save it under a new name; delete the old preset if needed.
+In **Style → Your templates**, select **Create template** to open the dedicated builder. Start with a blank design and compose word/phrase display, phrase length, active-word highlights, font, size, spacing, case, italic text, background box, outline, shadow, rotation and placement. Scrub or play the sample text to preview timing, give your design a name, then select **Save template** to save and apply it to the current video. Custom designs also render in MP4 exports.
+
+Use the pencil beside a saved template to reopen it for editing. Applying a template is undoable. Older saved presets remain available and can be opened in the builder. Leaving a changed builder asks before discarding edits; unsaved builder changes are not restored after refresh. The preview uses an illustrative 9:16 canvas; check fit on your actual video, especially with long phrases or text near the edges.
 
 Custom templates are **free for now**. Paid access is deferred; there are no billing or account requirements. The small template library is stored separately in browser localStorage, survives replacing/forgetting the current project, and is removed by clearing site data. It belongs to the same browser profile and site address as autosave. Save failures leave the previous library unchanged.
 
@@ -134,6 +136,8 @@ The app uses React, TypeScript and Vite, with Tailwind CSS for styling and Zusta
 | `npm audit --omit=dev` | Check production dependencies for known advisories          |
 
 Development and preview share a strict port: run one at a time. After rebuilding a production preview, download current edits and reload the page to load the new assets.
+
+Development uses file polling on Windows to pick up host/sandbox edits reliably and avoid stale CSS. Other platforms keep Vite's normal filesystem watcher.
 
 ### Project structure
 

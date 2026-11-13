@@ -187,6 +187,12 @@ export function App() {
 
   async function open(file?: File) {
     if (!file || importing.current || restoring) return;
+    if (document.querySelector(".template-builder")) {
+      setError(
+        "Save or close the template builder before changing your video.",
+      );
+      return;
+    }
     if (document.querySelector(".processing-banner")) {
       setError("Finish or cancel processing before changing the video.");
       return;

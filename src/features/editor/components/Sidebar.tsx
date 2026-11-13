@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { CustomTemplates } from "../../templates/CustomTemplates";
+import type { CustomTemplate } from "../../templates/storage";
 import {
   Check,
   CircleCheck,
@@ -33,6 +34,8 @@ export function Sidebar({
   generate,
   onError,
   saveLabel,
+  buildTemplate,
+  templateRevision,
 }: {
   time: number;
   seek: (n: number) => void;
@@ -40,6 +43,8 @@ export function Sidebar({
   generate: () => void;
   onError: (s: string) => void;
   saveLabel: string;
+  buildTemplate: (template: CustomTemplate | null) => void;
+  templateRevision: number;
 }) {
   const { project, selectedId, select, commit } = useEditor();
   const [tab, setTab] = useState<"captions" | "style">("captions");
@@ -364,7 +369,12 @@ export function Sidebar({
               </button>
             ))}
           </div>
-          <CustomTemplates busy={busy} onError={onError} />
+          <CustomTemplates
+            busy={busy}
+            onError={onError}
+            build={buildTemplate}
+            revision={templateRevision}
+          />
           <h3>Typography</h3>
           <label>
             Font
