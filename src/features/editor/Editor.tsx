@@ -32,15 +32,21 @@ export function Editor({
   source,
   exit,
   chooseVideo,
+  initialTime,
+  onTimeChange,
+  saveLabel,
 }: {
   source: VideoSource;
   exit: () => void;
   chooseVideo: () => void;
+  initialTime: number;
+  onTimeChange: (time: number) => void;
+  saveLabel: string;
 }) {
   const { project, past, future, selectedId, commit, undo, redo } = useEditor();
   const video = useRef<HTMLVideoElement>(null),
     frame = useRef<HTMLDivElement>(null);
-  const [time, setTime] = useState(0),
+  const [time, setTime] = useState(initialTime),
     [playing, setPlaying] = useState(false),
     [height, setHeight] = useState(400);
   const [error, setError] = useState(""),
@@ -59,9 +65,11 @@ export function Editor({
     (value: number) => {
       if (video.current)
         video.current.currentTime = clamp(value, 0, source.duration);
-      setTime(clamp(value, 0, source.duration));
+      const next = clamp(value, 0, source.duration);
+      setTime(next);
+      onTimeChange(next);
     },
-    [source.duration],
+    [source.duration, onTimeChange],
   );
   const togglePlay = useCallback(() => {
     if (!video.current) return;
@@ -394,6 +402,7 @@ export function Editor({
           busy={busy}
           generate={() => void runJob("transcribe")}
           onError={setError}
+          saveLabel={saveLabel}
         />
         <section className="preview-panel" aria-label="Video preview">
           <div className="preview-topline">
@@ -416,11 +425,18 @@ export function Editor({
                 src={source.url}
                 playsInline
                 preload="auto"
+                onLoadedMetadata={() => seek(initialTime)}
                 onPlay={() => setPlaying(true)}
                 onPause={() => setPlaying(false)}
                 onEnded={() => setPlaying(false)}
                 onTimeUpdate={() => {
-                  if (video.current) setTime(video.current.currentTime);
+                  if (video.current) {
+                    setTime(video.current.currentTime);
+                    onTimeChange(video.current.currentTime);
+                  }
+                }}
+                onSeeked={() => {
+                  if (video.current) onTimeChange(video.current.currentTime);
                 }}
                 onError={() =>
                   setError("The video could not be played. Try an H.264 MP4.")

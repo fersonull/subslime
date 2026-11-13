@@ -102,11 +102,20 @@ function ExampleFrame({
   );
 }
 
-export function Landing({ chooseVideo }: { chooseVideo: () => void }) {
+export function Landing({
+  chooseVideo,
+  savedName,
+  resume,
+  forget,
+}: {
+  chooseVideo: () => void;
+  savedName?: string;
+  resume: () => void;
+  forget: () => void;
+}) {
   const [index, setIndex] = useState(2),
     [playing, setPlaying] = useState(false);
   const [template, setTemplate] = useState<CaptionTemplate>("classic-pop");
-  const [dragging, setDragging] = useState(false);
   const privacy = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (!playing || matchMedia("(prefers-reduced-motion: reduce)").matches)
@@ -140,20 +149,7 @@ export function Landing({ chooseVideo }: { chooseVideo: () => void }) {
   }, []);
   const time = index * 0.8 + 0.1;
   return (
-    <div
-      className="landing"
-      onDragOver={(e) => {
-        if (e.dataTransfer.types.includes("Files")) {
-          e.preventDefault();
-          setDragging(true);
-        }
-      }}
-      onDragLeave={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node))
-          setDragging(false);
-      }}
-      onDrop={() => setDragging(false)}
-    >
+    <div className="landing">
       <header className="landing-header">
         <a href="#" aria-label="Subslime home">
           <Brand />
@@ -197,10 +193,19 @@ export function Landing({ chooseVideo }: { chooseVideo: () => void }) {
                 Upload a video. Get perfectly editable captions. Export in your
                 style.
               </p>
-              <button
-                className={`upload-zone ${dragging ? "dragging" : ""}`}
-                onClick={chooseVideo}
-              >
+              {savedName && (
+                <div className="saved-project">
+                  <span>Current project</span>
+                  <strong title={savedName}>{savedName}</strong>
+                  <button className="button small" onClick={resume}>
+                    Resume editing
+                  </button>
+                  <button className="text-link" onClick={forget}>
+                    Forget saved project
+                  </button>
+                </div>
+              )}
+              <button className="upload-zone" onClick={chooseVideo}>
                 <span className="upload-symbol">
                   <Upload size={25} strokeWidth={1.5} />
                 </span>
@@ -498,8 +503,11 @@ export function Landing({ chooseVideo }: { chooseVideo: () => void }) {
         <h2 id="privacy-title">Your video stays yours.</h2>
         <p>
           Videos, audio, captions and exports are processed on your device.
-          There are no accounts, analytics or video uploads. Your work lives in
-          this tab; download it before leaving or reloading.
+          There are no accounts, analytics or video uploads. The current video,
+          captions, style and playback position autosave in this browser's local
+          storage. Use “Forget saved project” on the home screen to remove them.
+          Clearing site data, private browsing or storage eviction can remove
+          the saved project, so keep downloaded exports as backups.
         </p>
         <p>
           First use downloads the English Whisper model from Hugging Face. That

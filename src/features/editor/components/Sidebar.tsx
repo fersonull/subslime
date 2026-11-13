@@ -21,12 +21,14 @@ export function Sidebar({
   busy,
   generate,
   onError,
+  saveLabel,
 }: {
   time: number;
   seek: (n: number) => void;
   busy: boolean;
   generate: () => void;
   onError: (s: string) => void;
+  saveLabel: string;
 }) {
   const { project, selectedId, select, commit } = useEditor();
   const [tab, setTab] = useState<"captions" | "style">("captions");
@@ -439,9 +441,8 @@ export function Sidebar({
           </label>
         </div>
       )}
-      <div className="sidebar-footer">
-        <span className="local-indicator" /> Local session · not saved after
-        closing
+      <div className="sidebar-footer" role="status" aria-live="off">
+        <span className="local-indicator" /> {saveLabel}
       </div>
     </aside>
   );

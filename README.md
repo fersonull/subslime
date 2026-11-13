@@ -8,10 +8,12 @@ Turn speech into editable word-level captions, adjust their timing and appearanc
 
 **Status:** early MVP. English transcription is available; browser compatibility, word alignment and performance on larger videos still need broader testing.
 
-[Quick start](#quick-start) · [Usage](#usage) · [Privacy](#privacy) · [Development](#development) · [Contributing](#contributing) · [License](#license-and-acknowledgments)
+[Quick start](#quick-start) · [Usage](#usage) · [Autosave](#local-autosave) · [Privacy](#privacy) · [Development](#development) · [Contributing](#contributing) · [License](#license-and-acknowledgments)
 
 ## Features
 
+- **Local autosave:** resume the current video, captions, style and playback position after refreshing.
+- **File-drop overlay:** a full-page waiting-to-drop state with the square C/reversed-C slime mark.
 - **Local video import and playback:** MP4, WebM and MOV where the browser supports their codecs.
 - **Automatic English captions:** Whisper tiny transcription in a worker, with editable word timestamps, download status and cancellation.
 - **Word-level editing:** correct text, add/delete captions, split multiword captions, merge neighbors, and move or trim individual clips.
@@ -50,7 +52,7 @@ No API key, account, backend service or environment variables are required.
 4. Choose a template in **Style**, then adjust typography, colors and placement.
 5. Select **Export** to download a captioned MP4, SRT or VTT file.
 
-**Download your work before closing, reloading or replacing the video.** Projects live in tab memory; there is no project save/load or cloud storage yet. Browser leave warnings are a convenience, not a backup.
+**Wait for “Saved on this device” before refreshing or closing the tab.** The current project restores automatically when you reopen the same app address. Keep downloaded video/subtitle exports as backups.
 
 ### Keyboard controls
 
@@ -67,6 +69,20 @@ No API key, account, backend service or environment variables are required.
 
 Text inputs retain their normal editing shortcuts. Playback/nudge shortcuts apply when focus is outside text fields and interactive buttons. Drag interactions also have numeric or range-control alternatives.
 
+## Local autosave
+
+Subslime uses [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API) to store the current source video and editing state in your browser. The video is written once when you open a new project; subsequent edits update only a smaller state record.
+
+- Refreshing restores the video, caption text/timing, template, typography/colors/position, selected word and playback position.
+- Returning home keeps the project. Select **Resume editing** to continue, or **Forget saved project** to remove its local video and editing data.
+- Opening a different video replaces the single current project after confirmation. A failed replacement save preserves the previous stored project.
+- **Saving on this device…**, **Saved on this device** and **Autosave unavailable** show the current save state. If storage is blocked or full, editing remains available in the tab; download your work and use **Retry autosave** after resolving the storage problem.
+- Undo/redo history and running transcription/export jobs reset on refresh.
+
+Storage belongs to the current browser profile and site address, including its port. Changing browsers, switching between localhost and 127.0.0.1, or changing ports uses a different autosave. Use one editing tab at a time; simultaneous edits to the same project can overwrite each other.
+
+Browser cleanup, storage eviction and ending a private-browsing session can remove saved data. Local autosave is not a backup or a cloud project library. Forgetting a project does not clear downloaded speech-model caches.
+
 ## Supported inputs and limitations
 
 | Area            | Current behavior                                                         |
@@ -78,7 +94,7 @@ Text inputs retain their normal editing shortcuts. Playback/nudge shortcuts appl
 | Transcription   | English, using Whisper tiny; generated text and timing need review       |
 | Video export    | H.264 MP4 with AAC audio when the source has a supported audio track     |
 | Subtitle export | SRT / VTT with individual-word timings                                   |
-| Project storage | Current browser tab only                                                 |
+| Project storage | One current project in browser-local IndexedDB                           |
 
 These limits are guardrails, not a guarantee that every device can process the maximum. Start with a short H.264 MP4. Firefox, Safari and physical mobile devices need further verification.
 
@@ -91,7 +107,7 @@ Export can be slow or memory-intensive. Audio is re-encoded to AAC, rather than 
 - Source videos, extracted audio, recognized captions and rendered output are processed on your device. The app has no media-upload backend or analytics.
 - The app host serves application, font and FFmpeg files. Hugging Face serves the speech model, and the inference runtime can fetch assets from jsDelivr. These providers receive ordinary asset requests, including your network address.
 - Model files may remain in your browser's cache. Internet access is required for their initial download; Subslime is not an installable offline PWA.
-- Closing or reloading a tab discards its project state. Downloading an export is the way to keep your work.
+- The current video and edits persist in this browser profile. Anyone with access to that profile may be able to reopen them. On a shared device, use **Forget saved project** when finished, and keep downloaded exports as backups.
 
 ## Development
 
@@ -122,6 +138,7 @@ src/
     captions/               # Caption model, timing, serialization and overlay
     editor/                 # Editor screen, history store, timeline and sidebar
     landing/                # Landing page and demonstrations
+    projects/               # Browser-local project storage and validation
     transcription/          # Speech worker and its client
     video/                  # Import, FFmpeg processing, downloads and video types
 tests/
@@ -151,7 +168,7 @@ Select an available browser channel in [playwright.config.ts](playwright.config.
 
 The configuration reuses a server already running on port 4180. For production-build verification, stop a running development server before the browser suite starts its preview server. Avoid editing watched files during a browser test run.
 
-Coverage includes import, caption editing, history, dragging, timer layout stability, download failure recovery, transcription/cancellation, subtitle downloads, and playable 720p/1080p exports with retained audio. Synthetic fixtures establish feasibility; they are not a representative accuracy or memory benchmark.
+Coverage includes import, local autosave/refresh recovery, storage failures and atomic replacement, stale-tab protection, drag/drop feedback, caption editing, history, timer layout stability, download failure recovery, transcription/cancellation, subtitle downloads, and playable 720p/1080p exports with retained audio. Synthetic fixtures establish feasibility; they are not a representative accuracy or memory benchmark.
 
 ## Deployment
 

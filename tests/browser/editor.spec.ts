@@ -3,7 +3,9 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 
 const fixtureFolder = "tests/fixtures/generated";
 
-test("timeline scrubbing does not select text, including outside the timeline", async ({ page }) => {
+test("timeline scrubbing does not select text, including outside the timeline", async ({
+  page,
+}) => {
   const bytes = await fixture(page);
   await page.getByLabel("Choose a video file").setInputFiles({
     name: "speech.webm",
@@ -392,17 +394,236 @@ test("invalid files show an actionable upload error", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 });
 
-test("playback controls stay in place when timer digits change", async ({
+test("autosave restores the video, captions, styling and playhead after refresh", async ({
   page,
 }) => {
   const bytes = await fixture(page);
   await page
     .getByLabel("Choose a video file")
     .setInputFiles({
-      name: "speech.webm",
+      name: "resume.webm",
       mimeType: "video/webm",
       buffer: bytes,
     });
+  await page.getByLabel("Add caption", { exact: true }).click();
+  await page.getByLabel("Caption 1 text").fill("Remember me");
+  await page.getByLabel("Caption 1 text").press("Enter");
+  await page.getByRole("tab", { name: "Style", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Bold Highlight", exact: true })
+    .click();
+  await page.getByRole("combobox").selectOption("Noto Sans Mono");
+  await page.getByLabel("Caption vertical position").fill("65");
+  await page.getByLabel("Video playhead").fill("1.25");
+  await expect(
+    page.getByText("Saved on this device", { exact: true }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("resume.webm", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Caption 1 text")).toHaveValue("Remember me");
+  await expect
+    .poll(async () =>
+      Number(await page.getByLabel("Video playhead").inputValue()),
+    )
+    .toBeCloseTo(1.25, 2);
+  await page.getByRole("tab", { name: "Style", exact: true }).click();
+  await expect(page.getByRole("combobox")).toHaveValue("Noto Sans Mono");
+  await expect(page.getByLabel("Caption vertical position")).toHaveValue("65");
+  await expect(page.locator(".editor-templates .chosen")).toHaveAccessibleName(
+    "Bold Highlight",
+  );
+  await page
+    .getByRole("button", { name: "Return to home", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Resume editing", exact: true })
+    .click();
+  await expect(page.getByRole("tab", { name: /Captions/ })).toBeVisible();
+  await page
+    .getByRole("button", { name: "Return to home", exact: true })
+    .click();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page
+    .getByRole("button", { name: "Forget saved project", exact: true })
+    .click();
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Open editor", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Resume editing", exact: true }),
+  ).toHaveCount(0);
+});
+
+test("a file drag shows the CC drop overlay without flickering between child elements", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const files = await page.evaluateHandle(() => {
+    const data = new DataTransfer();
+    data.items.add(
+      new File(["bad video"], "drop.webm", { type: "video/webm" }),
+    );
+    return data;
+  });
+  await page
+    .locator(".app-root")
+    .dispatchEvent("dragenter", { dataTransfer: files });
+  await expect(
+    page.getByRole("heading", { name: "Drop your video here.", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".file-drop-panel img")).toHaveAttribute(
+    "src",
+    "/favicon.svg",
+  );
+  await page
+    .locator(".hero-intro")
+    .dispatchEvent("dragenter", { dataTransfer: files });
+  await page
+    .locator(".hero-intro")
+    .dispatchEvent("dragleave", { dataTransfer: files });
+  await expect(page.locator(".file-drop-overlay")).toBeVisible();
+  await page.screenshot({ path: "test-results/file-drop-desktop.png" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: "test-results/file-drop-phone.png" });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page
+    .locator(".app-root")
+    .dispatchEvent("drop", { dataTransfer: files });
+  await expect(page.locator(".file-drop-overlay")).toHaveCount(0);
+  await expect(page.getByRole("alert")).toContainText(
+    "cannot decode this video",
+  );
+  await files.dispose();
+});
+
+test("storage failure is visible and does not prevent editing", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "indexedDB", {
+      get() {
+        throw new DOMException("Storage is disabled.", "SecurityError");
+      },
+    });
+  });
+  const bytes = await fixture(page);
+  await page
+    .getByLabel("Choose a video file")
+    .setInputFiles({
+      name: "private.webm",
+      mimeType: "video/webm",
+      buffer: bytes,
+    });
+  await expect(page.getByRole("alert")).toContainText("Autosave unavailable");
+  await page.getByLabel("Add caption", { exact: true }).click();
+  await expect(page.getByLabel("Caption 1 text")).toHaveValue("word");
+  await expect(
+    page.getByRole("button", { name: "Export", exact: true }),
+  ).toBeEnabled();
+});
+
+test("a failed video save keeps the previous project intact", async ({
+  page,
+}) => {
+  const bytes = await fixture(page);
+  await page
+    .getByLabel("Choose a video file")
+    .setInputFiles({
+      name: "original.webm",
+      mimeType: "video/webm",
+      buffer: bytes,
+    });
+  await page.getByLabel("Add caption", { exact: true }).click();
+  await page.getByLabel("Caption 1 text").fill("Keep this");
+  await page.getByLabel("Caption 1 text").press("Enter");
+  await expect(
+    page.getByText("Saved on this device", { exact: true }),
+  ).toBeVisible();
+  await page.evaluate(() => {
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (value, key) {
+      if (key === "state")
+        throw new DOMException("No space", "QuotaExceededError");
+      return put.call(this, value, key);
+    };
+  });
+  page.once("dialog", (dialog) => dialog.accept());
+  await page
+    .getByLabel("Choose a video file")
+    .setInputFiles({
+      name: "replacement.webm",
+      mimeType: "video/webm",
+      buffer: bytes,
+    });
+  await expect(page.getByRole("alert")).toContainText(
+    "Browser storage is full",
+  );
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.reload();
+  await expect(page.getByText("original.webm", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Caption 1 text")).toHaveValue("Keep this");
+});
+
+test("a stale tab cannot overwrite a project opened in another tab", async ({
+  page,
+  context,
+}) => {
+  const bytes = await fixture(page);
+  await page
+    .getByLabel("Choose a video file")
+    .setInputFiles({
+      name: "first.webm",
+      mimeType: "video/webm",
+      buffer: bytes,
+    });
+  await page.getByLabel("Add caption", { exact: true }).click();
+  await expect(
+    page.getByText("Saved on this device", { exact: true }),
+  ).toBeVisible();
+  const newer = await context.newPage();
+  await newer.goto("/");
+  await expect(newer.getByText("first.webm", { exact: true })).toBeVisible();
+  newer.once("dialog", (dialog) => dialog.accept());
+  await newer
+    .getByLabel("Choose a video file")
+    .setInputFiles({
+      name: "second.webm",
+      mimeType: "video/webm",
+      buffer: bytes,
+    });
+  await expect(
+    newer.getByText("Saved on this device", { exact: true }),
+  ).toBeVisible();
+  await page.getByLabel("Caption 1 text").fill("Old tab edit");
+  await page.getByLabel("Caption 1 text").press("Enter");
+  await expect(page.getByRole("alert")).toContainText(
+    "Another tab changed the saved project",
+  );
+  await page
+    .getByRole("button", { name: "Retry autosave", exact: true })
+    .click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Another tab changed the saved project",
+  );
+  await newer.reload();
+  await expect(newer.getByText("second.webm", { exact: true })).toBeVisible();
+  await expect(newer.getByLabel("Caption 1 text")).toHaveCount(0);
+});
+
+test("playback controls stay in place when timer digits change", async ({
+  page,
+}) => {
+  const bytes = await fixture(page);
+  await page.getByLabel("Choose a video file").setInputFiles({
+    name: "speech.webm",
+    mimeType: "video/webm",
+    buffer: bytes,
+  });
   await expect(page.getByLabel("Subtitle timeline")).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
   for (const width of [1440, 390]) {

@@ -43,3 +43,15 @@ Source code is organized by feature under `src/features`, with app composition/s
 The reported fetch failure was reproduced as a stopped local preview server: the browser retained the page but could not fetch its on-demand processing files. Restoring the server allowed the in-app browser to generate 12 words from the synthetic speech fixture, with no browser errors. Development and preview now share a strict port, 4180. Missing engine modules/core files and unavailable speech-model downloads have separate recovery messages; failed/retried jobs preserve edits. Tests exercise both blocked download paths, and a unit regression covers failure to import the engine module itself.
 
 The header and favicon use the same original monochrome slime SVG. The editor no longer imports its brand from the landing feature.
+
+## Local project autosave and drop feedback
+
+The current project now uses native IndexedDB, scoped to the browser profile and origin. A versioned state record stores captions, styling, selected word and playhead; a separate record holds the original File and a project ID. Creating/replacing a project writes both records in one transaction. Subsequent edits write only state, and report success after transaction completion. New object URLs are created from the restored File rather than storing expiring URLs.
+
+Restoration validates timing, style and playback values before hydrating the editor, then checks the video metadata against the saved duration. Undo history and processing jobs restart fresh. Saving is triggered by project/selection edits and playback/seek events. Pending or failed writes retain the leave warning; storage errors remain visible with a retry action. A failed initial save leaves the current editor usable in memory and leaves the previous disk project intact. Metadata updates and deletion check the project ID so an older tab cannot overwrite/remove a newly opened project; simultaneous editing of the same project in multiple tabs remains unsupported.
+
+Returning home keeps the project and offers Resume editing and Forget saved project. Forget requires confirmation and removes only the app's current project records, leaving model caches alone. Browser storage is best-effort; private browsing, clearing site data or browser eviction can remove it. Exports remain the backup path.
+
+The original slime is reworked as a square C and mirrored C, with square eyes and a rectangular mouth. The favicon, shared brand, README banner and full-page drop overlay use the same mark. Nested file-drag entries use a depth counter to avoid flicker; drop, leaving the page, drag-end, Escape and window blur clear the feedback. Text drags keep normal browser behavior. The overlay has live status text, does not steal focus and does not intercept the underlying drop target.
+
+Verification includes native browser IndexedDB restoration of the video, words, style and playhead; quota failure after a replacement video write; blocked storage; stale-tab retries; forgetting saved data; and desktop/phone overlay screenshots. Storage-data validation is also unit-tested.
