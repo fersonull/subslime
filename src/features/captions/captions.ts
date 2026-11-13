@@ -1,4 +1,9 @@
-import type { CaptionStyle, CaptionTemplate, SubtitleWord } from "./model";
+import type {
+  CaptionDesign,
+  CaptionStyle,
+  CaptionTemplate,
+  SubtitleWord,
+} from "./model";
 
 export const MIN_WORD = 0.04;
 const TIMING_EPSILON = 0.00001;
@@ -126,15 +131,23 @@ export function captionAt(
   words: SubtitleWord[],
   time: number,
   template: CaptionTemplate,
+  design?: CaptionDesign,
 ) {
   const index = words.findIndex((w) => time >= w.start && time < w.end);
   if (index < 0) return null;
-  if (template !== "karaoke")
+  if (
+    template !== "karaoke" &&
+    !(template === "custom" && design?.display === "phrase")
+  )
     return { words: [words[index]], activeId: words[index].id };
   const groups: SubtitleWord[][] = [];
   for (const word of words) {
     const group = groups.at(-1);
-    if (!group || group.length === 5 || word.start - group.at(-1)!.end > 0.5)
+    if (
+      !group ||
+      group.length === (template === "custom" ? design!.wordsPerLine : 5) ||
+      word.start - group.at(-1)!.end > 0.5
+    )
       groups.push([word]);
     else group.push(word);
   }
@@ -193,21 +206,39 @@ export function toAss(
     size = style.fontSize * scale;
   // Both bundled Noto fonts have Win ascent + descent = 1362, unitsPerEm = 1000; libass sizes by that height.
   const assSize = rounded(size * 1.362);
-  const boxed =
-    style.template === "bold-highlight" || style.template === "minimal-box";
+  const design = style.template === "custom" ? style.design : undefined;
+  const boxed = design
+    ? design.box
+    : style.template === "bold-highlight" || style.template === "minimal-box";
   const styleLine = (name: string, active = false) => {
-    const color = assColor(active ? style.backgroundColor : style.textColor);
-    const outline = assColor(
-      active
-        ? style.textColor
-        : boxed
+    const activeBox = active && design?.highlight === "box";
+    const color = assColor(
+      design
+        ? active && design.highlight === "text"
+          ? design.highlightColor
+          : style.textColor
+        : active
           ? style.backgroundColor
-          : style.outlineColor,
+          : style.textColor,
     );
-    return `Style: ${name},${style.fontFamily},${assSize},${color},${color},${outline},${outline},-1,0,0,0,100,100,0,0,${boxed || active ? 3 : 1},${boxed || active ? size * 0.15 : style.outlineWidth * scale},0,5,0,0,0,1`;
+    const outline = assColor(
+      design
+        ? activeBox
+          ? design.highlightColor
+          : boxed
+            ? style.backgroundColor
+            : style.outlineColor
+        : active
+          ? style.textColor
+          : boxed
+            ? style.backgroundColor
+            : style.outlineColor,
+    );
+    const useBox = boxed || (design ? activeBox : active);
+    return `Style: ${name},${style.fontFamily},${assSize},${color},${color},${outline},${design ? "&H00000000" : outline},-1,${design?.italic ? -1 : 0},0,0,100,100,${(design?.letterSpacing ?? 0) * scale},${design?.rotation ?? 0},${useBox ? 3 : 1},${useBox ? (design ? design.padding * scale : size * 0.15) : style.outlineWidth * scale},${(design?.shadow ?? 0) * scale},5,0,0,0,1`;
   };
-  const header = `[Script Info]\nScriptType: v4.00+\nPlayResX: ${width}\nPlayResY: ${height}\nWrapStyle: 2\nScaledBorderAndShadow: yes\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n${styleLine("Default")}\n${style.template === "karaoke" ? styleLine("Active", true) : ""}\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
-  const position = `{\\an5\\pos(${Math.round((width * style.positionX) / 100)},${Math.round((height * style.positionY) / 100)})${boxed ? `\\xbord${size * 0.25}\\ybord${size * 0.064}` : ""}}`;
+  const header = `[Script Info]\nScriptType: v4.00+\nPlayResX: ${width}\nPlayResY: ${height}\nWrapStyle: 2\nScaledBorderAndShadow: yes\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n${styleLine("Default")}\n${style.template === "karaoke" || (design && design.highlight !== "none") ? styleLine("Active", true) : ""}\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
+  const position = `{\\an5\\pos(${Math.round((width * style.positionX) / 100)},${Math.round((height * style.positionY) / 100)})${boxed && !design ? `\\xbord${size * 0.25}\\ybord${size * 0.064}` : ""}}`;
   return (
     header +
     words
@@ -216,14 +247,17 @@ export function toAss(
           words,
           w.start + Math.min(0.001, (w.end - w.start) / 2),
           style.template,
+          design,
         )!;
         const text =
-          style.template === "karaoke"
+          style.template === "karaoke" || design
             ? frame.words
                 .map((item) =>
-                  item.id === w.id
-                    ? `{\\rActive\\xbord${size * 0.12}\\ybord${size * 0.064}}${assEscape(item.text)}{\\rDefault}`
-                    : assEscape(item.text),
+                  item.id === w.id && (!design || design.highlight !== "none")
+                    ? `{\\rActive${design ? "" : `\\xbord${size * 0.12}\\ybord${size * 0.064}`}}${assEscape(design?.uppercase ? item.text.toUpperCase() : item.text)}{\\rDefault}`
+                    : assEscape(
+                        design?.uppercase ? item.text.toUpperCase() : item.text,
+                      ),
                 )
                 .join(" ")
             : assEscape(w.text);
