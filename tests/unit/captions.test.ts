@@ -8,8 +8,10 @@ import {
   mergeWord,
   captionAt,
   toAss,
+  validWords,
 } from "../../src/features/captions/captions";
 import { defaultStyle } from "../../src/features/captions/model";
+import { useEditor } from "../../src/features/editor/store";
 
 const words = [
   { id: "a", text: "Make", start: 0.1, end: 0.5 },
@@ -18,6 +20,37 @@ const words = [
 ];
 
 describe("caption timing and editing", () => {
+  it("accepts generated captions ending at a fractional video duration", () => {
+    const duration = 65.17006;
+    const generated = normalizeWords(
+      [{ text: "captions.", timestamp: [64.9, null] }],
+      duration,
+    );
+    useEditor.getState().reset(duration);
+    expect(() =>
+      useEditor
+        .getState()
+        .commit((project) => ({ ...project, words: generated })),
+    ).not.toThrow();
+    expect(generated[0].end).toBe(duration);
+  });
+  it("keeps edits valid at precise video and neighboring word boundaries", () => {
+    const duration = 1.00006;
+    const original = [
+      { id: "a", text: "one two", start: 0.00004, end: 0.08006 },
+      { id: "b", text: "last", start: 0.10006, end: 0.5 },
+    ];
+    expect(
+      validWords(trimWord(original, "b", "end", 2, duration), duration),
+    ).toBe(true);
+    expect(
+      validWords(trimWord(original, "a", "end", 0.2, duration), duration),
+    ).toBe(true);
+    expect(validWords(moveWord(original, "b", 2, duration), duration)).toBe(
+      true,
+    );
+    expect(validWords(splitWord(original, "a"), duration)).toBe(true);
+  });
   it("rejects invalid data and bounds overlapping model timings", () => {
     expect(
       normalizeWords(
@@ -36,10 +69,9 @@ describe("caption timing and editing", () => {
     ).toThrow();
   });
   it("clamps moves and trims between adjacent captions", () => {
-    expect(moveWord(words, "b", 4, 3)[1]).toMatchObject({
-      start: 0.7,
-      end: 1.1,
-    });
+    const moved = moveWord(words, "b", 4, 3)[1];
+    expect(moved.start).toBeCloseTo(0.7, 10);
+    expect(moved.end).toBeCloseTo(1.1, 10);
     expect(trimWord(words, "b", "start", -4, 3)[1].start).toBe(0.5);
     expect(trimWord(words, "b", "end", 8, 3)[1].end).toBe(1.1);
   });

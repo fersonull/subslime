@@ -1,6 +1,7 @@
 import type { CaptionStyle, CaptionTemplate, SubtitleWord } from "./model";
 
 export const MIN_WORD = 0.04;
+const TIMING_EPSILON = 0.00001;
 export const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
 const rounded = (n: number) => Math.round(n * 10000) / 10000;
@@ -26,12 +27,12 @@ export function normalizeWords(
       const next = chunks[index + 1]?.timestamp[0];
       end = clamp(rawEnd ?? next ?? duration, start, duration);
       const text = chunk.text.trim();
-      if (!text || end - start < MIN_WORD) return null;
+      if (!text || end - start < MIN_WORD - TIMING_EPSILON) return null;
       return {
         id: crypto.randomUUID(),
         text,
-        start: rounded(start),
-        end: rounded(end),
+        start,
+        end,
       };
     })
     .filter((word): word is SubtitleWord => word !== null);
@@ -45,9 +46,9 @@ export function validWords(words: SubtitleWord[], duration: number): boolean {
       Number.isFinite(w.start) &&
       Number.isFinite(w.end) &&
       w.start >= 0 &&
-      w.end <= duration + 0.00001 &&
-      w.end - w.start >= MIN_WORD - 0.00001 &&
-      (i === 0 || words[i - 1].end <= w.start + 0.00001),
+      w.end <= duration + TIMING_EPSILON &&
+      w.end - w.start >= MIN_WORD - TIMING_EPSILON &&
+      (i === 0 || words[i - 1].end <= w.start + TIMING_EPSILON),
   );
 }
 
@@ -61,15 +62,13 @@ export function moveWord(
   if (i < 0) return words;
   const word = words[i],
     length = word.end - word.start;
-  const value = rounded(
-    clamp(
-      start,
-      words[i - 1]?.end ?? 0,
-      (words[i + 1]?.start ?? duration) - length,
-    ),
+  const value = clamp(
+    start,
+    words[i - 1]?.end ?? 0,
+    (words[i + 1]?.start ?? duration) - length,
   );
   return words.map((w) =>
-    w.id === id ? { ...w, start: value, end: rounded(value + length) } : w,
+    w.id === id ? { ...w, start: value, end: value + length } : w,
   );
 }
 
@@ -87,7 +86,7 @@ export function trimWord(
     edge === "start"
       ? clamp(value, words[i - 1]?.end ?? 0, word.end - MIN_WORD)
       : clamp(value, word.start + MIN_WORD, words[i + 1]?.start ?? duration);
-  return words.map((w) => (w.id === id ? { ...w, [edge]: rounded(time) } : w));
+  return words.map((w) => (w.id === id ? { ...w, [edge]: time } : w));
 }
 
 export function splitWord(words: SubtitleWord[], id: string): SubtitleWord[] {
@@ -96,7 +95,7 @@ export function splitWord(words: SubtitleWord[], id: string): SubtitleWord[] {
     const pieces = w.text.trim().split(/\s+/);
     if (pieces.length < 2) return [w];
     const middle = Math.ceil(pieces.length / 2),
-      time = rounded((w.start + w.end) / 2);
+      time = (w.start + w.end) / 2;
     return [
       { ...w, text: pieces.slice(0, middle).join(" "), end: time },
       {
