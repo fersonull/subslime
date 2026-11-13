@@ -244,20 +244,14 @@ input[type="range"] {
 .button:hover:not(:disabled) {
   background: #363636;
 }
-.button,
-.upload-zone,
-.editor-templates > button,
-.custom-template-row > button:first-child {
+.button:not(.secondary) {
   background-image: linear-gradient(#ffffff12, #ffffff00);
   box-shadow:
     inset 0 1px 0 #ffffff2e,
     inset 0 -1px 0 #0004,
     0 2px 3px #0000001a;
 }
-.button:active:not(:disabled),
-.upload-zone:active:not(:disabled),
-.editor-templates > button:active:not(:disabled),
-.custom-template-row > button:first-child:active:not(:disabled) {
+.button:not(.secondary):active:not(:disabled) {
   transform: translateY(1px);
   box-shadow: inset 0 1px 2px #0004;
 }
@@ -271,7 +265,7 @@ input[type="range"] {
   font-size: 17px;
 }
 .button.secondary {
-  background-color: #fff;
+  background: transparent;
   color: var(--ink);
   border-color: #d5d5d5;
 }
@@ -1280,6 +1274,35 @@ h2 {
 }
 .caption-actions .button {
   flex: 1;
+}
+.ai-caption-button {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.ai-caption-button > * {
+  position: relative;
+  z-index: 1;
+}
+.ai-caption-button::before {
+  content: "";
+  position: absolute;
+  inset: -100% -30%;
+  background:
+    radial-gradient(ellipse at 25% 20%, #ffffff12, #ffffff00 60%),
+    radial-gradient(ellipse at 75% 80%, #ffffff12, #ffffff00 60%);
+  pointer-events: none;
+  transform: translate(-4%, -5%) rotate(-8deg);
+  animation: ai-caption-light 7s cubic-bezier(0.77, 0, 0.175, 1) infinite
+    alternate;
+}
+.ai-caption-button:disabled::before {
+  animation: none;
+}
+@keyframes ai-caption-light {
+  to {
+    transform: translate(4%, 5%) rotate(8deg);
+  }
 }
 .processing-note {
   font-size: 11px;

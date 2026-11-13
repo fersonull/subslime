@@ -3,6 +3,105 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 
 const fixtureFolder = "tests/fixtures/generated";
 
+test("only primary actions are raised and caption lighting respects motion and busy states", async ({
+  page,
+}) => {
+  const bytes = await fixture(page);
+  await expect(
+    page.getByRole("button", { name: "Open editor", exact: true }),
+  ).toHaveCSS("box-shadow", /inset/);
+  await expect(page.locator(".upload-zone")).toHaveCSS("box-shadow", "none");
+  await page.getByLabel("Choose a video file").setInputFiles({
+    name: "lighting.webm",
+    mimeType: "video/webm",
+    buffer: bytes,
+  });
+  const generate = page.getByRole("button", {
+    name: "Generate captions",
+    exact: true,
+  });
+  const animation = () =>
+    generate.evaluate(
+      (button) => getComputedStyle(button, "::before").animationName,
+    );
+  await expect.poll(animation).toBe("ai-caption-light");
+  const before = (await generate.boundingBox())!;
+  const phases = await generate.evaluate((button) => {
+    const light = button
+      .getAnimations({ subtree: true })
+      .find(
+        (item) =>
+          item instanceof CSSAnimation &&
+          item.animationName === "ai-caption-light",
+      )!;
+    light.pause();
+    light.currentTime = 0;
+    const start = getComputedStyle(button, "::before").transform;
+    light.currentTime = 7000;
+    const end = getComputedStyle(button, "::before").transform;
+    const opacity = getComputedStyle(button, "::before").opacity;
+    light.currentTime = 3500;
+    light.play();
+    return { start, end, opacity };
+  });
+  expect(phases.start).not.toBe(phases.end);
+  expect(phases.opacity).toBe("1");
+  expect((await generate.boundingBox())!.width).toBe(before.width);
+  await page.screenshot({
+    path: "test-results/caption-button-light.png",
+    animations: "allow",
+  });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect.poll(animation).toBe("none");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.getByLabel("Add caption", { exact: true }).click();
+  const regenerate = page.getByRole("button", {
+    name: "Regenerate",
+    exact: true,
+  });
+  expect((await regenerate.boundingBox())!.height).toBe(before.height);
+  await expect
+    .poll(() =>
+      regenerate.evaluate(
+        (button) => getComputedStyle(button, "::before").animationName,
+      ),
+    )
+    .toBe("ai-caption-light");
+  await page.getByRole("tab", { name: "Style", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Create template", exact: true }),
+  ).toHaveCSS("box-shadow", "none");
+  await expect(
+    page.getByRole("button", { name: "Classic Pop", exact: true }),
+  ).toHaveCSS("box-shadow", "none");
+  await page.getByRole("tab", { name: /Captions/ }).click();
+  let release!: () => void;
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/ffmpeg/ffmpeg-core.js", async (route) => {
+    await waiting;
+    await route.abort().catch(() => {});
+  });
+  try {
+    await regenerate.click();
+    await page
+      .getByRole("button", { name: "Regenerate captions", exact: true })
+      .click();
+    await expect(regenerate).toBeDisabled();
+    await expect
+      .poll(() =>
+        regenerate.evaluate(
+          (button) => getComputedStyle(button, "::before").animationName,
+        ),
+      )
+      .toBe("none");
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  } finally {
+    release();
+  }
+});
+
 test("notifications disappear and project confirmations use a custom dialog", async ({
   page,
 }) => {
@@ -49,7 +148,7 @@ test("notifications disappear and project confirmations use a custom dialog", as
       await page
         .getByRole("button", { name: "Cancel", exact: true })
         .evaluate((button) => getComputedStyle(button).boxShadow),
-    ).toContain("inset");
+    ).toBe("none");
     await page
       .getByRole("button", { name: "Replace project", exact: true })
       .hover();

@@ -134,9 +134,15 @@ export function Sidebar({
           aria-labelledby="captions-tab"
         >
           <div className="caption-actions">
-            <button className="button small" onClick={generate} disabled={busy}>
+            <button
+              className="button small ai-caption-button"
+              onClick={generate}
+              disabled={busy}
+            >
               <Sparkles size={16} aria-hidden="true" />
-              {project.words.length ? "Regenerate" : "Generate captions"}
+              <span>
+                {project.words.length ? "Regenerate" : "Generate captions"}
+              </span>
             </button>
             <button
               className="icon-button"
