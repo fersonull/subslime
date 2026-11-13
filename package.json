@@ -20,6 +20,7 @@
     "@fontsource-variable/dm-sans": "^5.2.8",
     "@huggingface/transformers": "^3.8.1",
     "@tailwindcss/vite": "^4.1.0",
+    "@vercel/analytics": "^2.0.1",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
