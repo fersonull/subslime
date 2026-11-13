@@ -139,6 +139,16 @@ input[type="range"] {
 .button:hover:not(:disabled) {
   background: #363636;
 }
+.button:not(.secondary) {
+  background-image: linear-gradient(#ffffff12, #ffffff00);
+  box-shadow:
+    inset 0 1px 0 #ffffff2e,
+    inset 0 -1px 0 #0004,
+    0 2px 3px #0000001a;
+}
+.button:not(.secondary):active:not(:disabled) {
+  box-shadow: inset 0 1px 2px #0004;
+}
 .button.small {
   font-size: 13px;
   padding: 10px 16px;
@@ -1457,6 +1467,8 @@ h2 {
   background: #e8e8e8;
 }
 .timeline-scroll {
+  -webkit-user-select: none;
+  user-select: none;
   overflow-x: auto;
   position: relative;
   display: flex;

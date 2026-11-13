@@ -3,6 +3,26 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 
 const fixtureFolder = "tests/fixtures/generated";
 
+test("timeline scrubbing does not select text, including outside the timeline", async ({ page }) => {
+  const bytes = await fixture(page);
+  await page.getByLabel("Choose a video file").setInputFiles({
+    name: "speech.webm",
+    mimeType: "video/webm",
+    buffer: bytes,
+  });
+  await expect(page.getByLabel("Subtitle timeline")).toBeVisible();
+  const ruler = (await page.locator(".time-ruler").boundingBox())!;
+  await page.mouse.move(ruler.x + 5, ruler.y + 15);
+  await page.mouse.down();
+  await page.mouse.move(ruler.x + 240, ruler.y + 15, { steps: 12 });
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("");
+  await expect(page.getByLabel("Video playhead")).not.toHaveValue("0");
+  await page.mouse.move(ruler.x + 300, ruler.y - 80, { steps: 8 });
+  await page.mouse.up();
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("");
+  await page.screenshot({ path: "test-results/editor-button-depth.png" });
+});
+
 async function fixture(page: Page, width = 720, height = 1280) {
   await page.goto("/");
   await page.getByRole("heading", { level: 1 }).click();

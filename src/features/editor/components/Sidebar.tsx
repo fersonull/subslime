@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Merge, Plus, Scissors, Trash2 } from "lucide-react";
+import { Check, Merge, Plus, Scissors, Sparkles, Trash2 } from "lucide-react";
 import {
   clamp,
   displayTime,
@@ -117,6 +117,7 @@ export function Sidebar({
         >
           <div className="caption-actions">
             <button className="button small" onClick={generate} disabled={busy}>
+              <Sparkles size={16} aria-hidden="true" />
               {project.words.length ? "Regenerate" : "Generate captions"}
             </button>
             <button
