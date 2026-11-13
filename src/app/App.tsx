@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LoaderCircle } from "lucide-react";
+import { Analytics } from "@vercel/analytics/react";
 import { useConfirm } from "../components/ConfirmDialog";
 import { Toast } from "../components/Toast";
 import { Landing } from "../features/landing/Landing";
@@ -386,6 +387,7 @@ export function App() {
           </div>
         </div>
       )}
+      <Analytics />
     </div>
   );
 }
