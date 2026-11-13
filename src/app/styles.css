@@ -1368,6 +1368,8 @@ h2 {
   flex-shrink: 0;
 }
 .time-display {
+  width: 19ch;
+  flex-shrink: 0;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;

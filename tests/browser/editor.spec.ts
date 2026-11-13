@@ -372,7 +372,7 @@ test("invalid files show an actionable upload error", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 });
 
-test("caption fetch failures explain how to recover and preserve existing edits", async ({
+test("playback controls stay in place when timer digits change", async ({
   page,
 }) => {
   const bytes = await fixture(page);
@@ -383,6 +383,57 @@ test("caption fetch failures explain how to recover and preserve existing edits"
       mimeType: "video/webm",
       buffer: bytes,
     });
+  await expect(page.getByLabel("Subtitle timeline")).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    const positions: {
+      timerWidth: number;
+      seekX: number;
+      seekWidth: number;
+      playX: number;
+    }[] = [];
+    for (const [value, text] of [
+      ["0.11", "00:00.11"],
+      ["0.88", "00:00.88"],
+      ["1.11", "00:01.11"],
+      ["3.88", "00:03.88"],
+    ]) {
+      await page.getByLabel("Video playhead").fill(value);
+      await expect(page.locator(".time-display")).toContainText(text);
+      const timer = (await page.locator(".time-display").boundingBox())!;
+      const seek = (await page.getByLabel("Video playhead").boundingBox())!;
+      const play = (await page
+        .getByRole("button", { name: "Play video", exact: true })
+        .boundingBox())!;
+      positions.push({
+        timerWidth: timer.width,
+        seekX: seek.x,
+        seekWidth: seek.width,
+        playX: play.x,
+      });
+    }
+    for (const position of positions)
+      for (const key of [
+        "timerWidth",
+        "seekX",
+        "seekWidth",
+        "playX",
+      ] as const) {
+        expect(Math.abs(position[key] - positions[0][key])).toBeLessThan(0.1);
+      }
+  }
+});
+
+test("caption fetch failures explain how to recover and preserve existing edits", async ({
+  page,
+}) => {
+  const bytes = await fixture(page);
+  await page.getByLabel("Choose a video file").setInputFiles({
+    name: "speech.webm",
+    mimeType: "video/webm",
+    buffer: bytes,
+  });
   await page.getByLabel("Add caption", { exact: true }).click();
   await page.route("**/ffmpeg/ffmpeg-core.js", (route) =>
     route.abort("connectionrefused"),
